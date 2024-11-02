@@ -1,212 +1,225 @@
-# DCI 691 Build 2 - Streamlit Bot (R. Beghetto, fall 2024)
-# Importing necessary libraries
-# This section brings in external code libraries that add functionality to our program.
-# Streamlit (st) is used to create web applications, google.generativeai helps with AI text generation,
-# PyPDF2 allows reading PDF files, and PIL (Python Imaging Library) helps with image processing.
 import streamlit as st
-import google.generativeai as genai
-from PyPDF2 import PdfReader
 from PIL import Image
+import google.generativeai as genai
+import json
+from datetime import datetime
+import pandas as pd
+from io import BytesIO
 
-# Streamlit configuration
-# This sets up the basic properties of the web application.
-# It sets the title that appears in the browser tab and makes the layout use the full width of the screen.
-# You can customize the page title (e.g., Creative Assistant" and layout by modifying these parameters.
-st.set_page_config(page_title="Streamlit Chatbot", layout="wide")
+# Page configuration
+st.set_page_config(page_title="EvalBuddy", page_icon="📊", layout="wide")
 
-# Display image
-# This code attempts to open and display an image file named 'Build2.png'.
-# If successful, it shows the image with a caption. If there's an error, it displays an error message instead.
-# You can customize this by changing the image file name and path. Supported image types include .png, .jpg, .jpeg, and .gif.
-# To use a different image, replace 'Build2.png' with your desired image file name (e.g., 'my_custom_image.jpg').
-image_path = 'Build2.png'
-try:
-    image = Image.open(image_path)
-    st.image(image, caption='Created by YOUR NAME (2024)', use_column_width=True)
-except Exception as e:
-    st.error(f"Error loading image: {e}")
+# Custom CSS for styling
+st.markdown("""
+<style>
+.big-font {
+    font-size:30px !important;
+    font-weight: bold;
+    text-align: center;
+}
+.user-message {
+    padding: 10px;
+    border-radius: 15px;
+    background-color: #e6f3ff;
+    margin: 5px 0;
+}
+.bot-message {
+    padding: 10px;
+    border-radius: 15px;
+    background-color: #f0f0f0;
+    margin: 5px 0;
+}
+.centered-image {
+    display: flex;
+    justify-content: center;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# Title and BotDescription 
-# This adds a main title to the web page and a description of the chatbot.
-# It also includes a note to remind users that the bot can make mistakes.
-# You can customize the title, description, and caption by modifying the text within the quotes.
-st.title("Welcome Build 2 Bot!")
-st.write("[Provide a description of your own bot for the user]")
-st.caption("Note: This Bot can make mistakes. Check all important information.")
-
-# Initialize Gemini client
-# This sets up the connection to the Gemini AI service using an API key.
-# The API key is a secret code that allows our application to use the Gemini service.
-# You need to set up their own API key in the Streamlit secrets management system.
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-
-# Initialize session state
-# This creates variables that persist across multiple interactions with the web application.
-# These variables store things like chat messages, AI model settings, and uploaded PDF content.
-# You can add new session state variables here if they want to store additional information.
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "model_name" not in st.session_state:
-    st.session_state.model_name = "gemini-1.5-pro-002"
-if "temperature" not in st.session_state:
-    st.session_state.temperature = 0.5
-if "debug" not in st.session_state:
-    st.session_state.debug = []
-if "pdf_content" not in st.session_state:
-    st.session_state.pdf_content = ""
+# Initialize session state variables
 if "chat_session" not in st.session_state:
     st.session_state.chat_session = None
-
-# Sidebar for model and temperature selection
-# This creates a sidebar on the web page with controls for the user to adjust settings.
-# Users can select different AI models and adjust the "temperature" which affects how creative the AI's responses are.
-# To add more customization options, users can add new input elements (e.g., buttons, sliders) to this sidebar.
-# For example, to add a new button: clear_button = st.sidebar.button("New Custom Action")
-with st.sidebar:
-    st.title("Settings")
-    st.caption("Note: Gemini-1.5-pro-002 can only handle 2 requests per minute, gemini-1.5-flash-002 can handle 15 per minute")
-    model_option = st.selectbox(
-        "Select Model:", ["gemini-1.5-flash-002", "gemini-1.5-pro-002"]
-    )
-    if model_option != st.session_state.model_name:
-        st.session_state.model_name = model_option
-        st.session_state.messages = []
-        st.session_state.chat_session = None
-    temperature = st.slider("Temperature:", 0.0, 1.0, st.session_state.temperature, 0.1)
-    st.session_state.temperature = temperature
-    uploaded_pdf = st.file_uploader("Upload PDF", type=["pdf"])
-    clear_button = st.button("Clear Chat")
-
-# Process uploaded PDF
-# This section handles the PDF file that a user might upload.
-# It reads the text content of the PDF and stores it for the chatbot to use in responses.
-# You can upload any PDF file, and the system will extract its text content.
-
-if uploaded_pdf:
-    try:
-        pdf_reader = PdfReader(uploaded_pdf)
-        pdf_text = ""
-        for page in pdf_reader.pages:
-            pdf_text += page.extract_text() + "\n"
-        st.session_state.pdf_content = pdf_text
-        st.session_state.debug.append(f"PDF processed: {len(pdf_text)} characters")
-        # Reset chat session when new PDF is uploaded
-        st.session_state.chat_session = None
-    except Exception as e:
-        st.error(f"Error processing PDF: {e}")
-        st.session_state.debug.append(f"PDF processing error: {e}")
-
-# Clear chat function
-# This function is triggered when the user clicks the "Clear Chat" button.
-# It resets all the chat-related variables, effectively starting a new conversation.
-# You can modify this function to clear additional custom variables if needed.
-if clear_button:
+if "messages" not in st.session_state:
     st.session_state.messages = []
-    st.session_state.debug = []
-    st.session_state.pdf_content = ""
-    st.session_state.chat_session = None
-    st.rerun()
+if "session_start_time" not in st.session_state:
+    st.session_state.session_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+if "experience_level" not in st.session_state:
+    st.session_state.experience_level = None
+if "evaluation_stage" not in st.session_state:
+    st.session_state.evaluation_stage = None
+if "cultural_context" not in st.session_state:
+    st.session_state.cultural_context = None
 
-# Load system prompt
-# This function reads a text file containing instructions for the chatbot.
-# These instructions guide how the chatbot should behave and respond to user inputs.
-# You can customize the chatbot's behavior by modifying the content of the 'instructions.txt' file.
-# This file should contain the desired system prompt or instructions for the AI model.
-def load_text_file(file_path):
+# Sidebar for navigation
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to", ["Home & Chat", "Resources & Export"])
+
+# Initialize GenerativeAI client
+genai.configure(api_key=st.secrets.get("GOOGLE_API_KEY", ""))
+
+# EvalBuddy prompt
+evalbuddy_prompt = """
+You are EvalBuddy, an advanced AI assistant specializing in culturally responsive evaluation for educators, researchers, program managers, and anyone involved in evaluation processes. Your primary role is to guide users through creating comprehensive, culturally sensitive, and effective evaluation plans. Follow these guidelines:
+
+[The full prompt as provided in the previous response]
+
+Always empower users to reflect accurately on their evaluation projects and offer support that respects cultural contexts and ethical considerations.
+"""
+
+# Function to initialize chat sessions
+def initialize_chat_session():
     try:
-        with open(file_path, 'r') as file:
-            return file.read()
-    except Exception as e:
-        st.error(f"Error loading text file: {e}")
-        return ""
-
-system_prompt = load_text_file('instructions.txt')
-
-# Display chat messages
-# This section shows all the messages exchanged between the user and the chatbot.
-# It creates a visual representation of the conversation on the web page.
-# You can customize the appearance of messages by modifying the Streamlit markdown styling.
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# User input
-# This creates a text input field where users can type their messages to the chatbot.
-# The placeholder text "Your message:" can be customized to any desired prompt, e.g., "Message Creative Assistant...".
-user_input = st.chat_input("Your message:")
-
-if user_input:
-    # Add user message to chat history
-    # This stores the user's message in the conversation history.
-    current_message = {"role": "user", "content": user_input}
-    st.session_state.messages.append(current_message)
-
-    with st.chat_message("user"):
-        st.markdown(current_message["content"])
-
-    # Generate and display assistant response
-    # This section handles the chatbot's response to the user's input.
-    # It uses the Gemini AI model to generate responses based on the conversation history and system prompt.
-    with st.chat_message("assistant"):
-        message_placeholder = st.empty()
-
-        # Prepare messages for Gemini API
-        # This part sets up the AI model with the chosen settings if it hasn't been done yet.
-        # You can modify the generation_config parameters to fine-tune the AI's behavior.
-        if st.session_state.chat_session is None:
-            generation_config = {
-                "temperature": st.session_state.temperature,
-                "top_p": 0.95,
-                "top_k": 40,
-                "max_output_tokens": 8192,
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-pro",
+            generation_config={
+                "temperature": 0.7,
+                "max_output_tokens": 1000
             }
-            model = genai.GenerativeModel(
-                model_name=st.session_state.model_name,
-                generation_config=generation_config,
-            )
-            
-            # Initialize chat with system prompt and PDF content
-            # The system prompt contains instructions for how the chatbot should behave.
-            # If a PDF was uploaded, its content is also included to give the chatbot context.
-            # You can modify this section to add additional context or instructions for the AI model.
-            initial_messages = [
-                {"role": "user", "parts": [f"System: {system_prompt}"]},
-                {"role": "model", "parts": ["Understood. I will follow these instructions."]},
-            ]
-            
-            if st.session_state.pdf_content:
-                initial_messages.extend([
-                    {"role": "user", "parts": [f"The following is the content of an uploaded PDF document. Please consider this information when responding to user queries:\n\n{st.session_state.pdf_content}"]},
-                    {"role": "model", "parts": ["I have received and will consider the PDF content in our conversation."]}
-                ])
-            
-            st.session_state.chat_session = model.start_chat(history=initial_messages)
+        )
+        
+        initial_messages = [
+            {"role": "model", "parts": [{"text": evalbuddy_prompt}]},
+            {"role": "model", "parts": [{"text": "Welcome to EvalBuddy! I'm here to assist you with culturally responsive evaluation. To get started, could you tell me about your experience level with culturally responsive evaluation? Are you a beginner, intermediate, or advanced practitioner?"}]}
+        ]
 
-        # Generate response with error handling
-        # This tries to get a response from the AI model and display it.
-        # If there's an error, it shows an error message instead.
+        st.session_state.chat_session = model.start_chat(history=initial_messages)
+        
+    except Exception as e:
+        st.error(f"Error during chat initialization: {e}")
+
+# Function to display centered image
+def display_centered_image(image_path, caption):
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
         try:
-            response = st.session_state.chat_session.send_message(current_message["content"])
-
-            full_response = response.text
-            message_placeholder.markdown(full_response)
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
-            st.session_state.debug.append("Assistant response generated")
-
+            image = Image.open(image_path)
+            st.image(image, caption=caption, use_column_width=True)
         except Exception as e:
-            st.error(f"An error occurred while generating the response: {e}")
-            st.session_state.debug.append(f"Error: {e}")
+            st.error(f"Error loading image: {e}")
 
-    st.rerun()
+# Home & Chat Page
+if page == "Home & Chat":
+    st.markdown('<p class="big-font">Welcome to EvalBuddy!</p>', unsafe_allow_html=True)
+    
+    # Display centered image (replace 'EvalBuddy.webp' with your actual image path)
+    display_centered_image('EvalBuddy.webp', 'Your Culturally Responsive Evaluation Assistant')
+    
+    st.write("AI-driven assistant to guide you through culturally responsive evaluation.")
+    
+    # Initialize the session if not already started
+    if st.session_state.chat_session is None:
+        initialize_chat_session()
 
-# Debug information
-# This displays technical information about what's happening in the application.
-# It's useful for developers to understand how the program is working or to identify issues.
-# If errors occur, users can copy the error message and the full code, then paste it into AI assistants like Claude,
-# ChatGPT, or Google Gemini for debugging help. These AI tools can suggest fixes or explain the error.
-# Youcan also ask these AI assistants for help with customizing the interface, such as adding new buttons to the sidebar or modifying the layout. 
-# Simply describe the desired changes and ask for code suggestions.
+    # Experience level selection (only show if not already selected)
+    if st.session_state.experience_level is None:
+        experience_options = ["Beginner", "Intermediate", "Advanced"]
+        st.session_state.experience_level = st.selectbox("What is your experience level with culturally responsive evaluation?", experience_options)
+        if st.session_state.experience_level:
+            st.session_state.messages.append({"role": "user", "parts": [{"text": f"My experience level is {st.session_state.experience_level}"}]})
+            st.experimental_rerun()
 
-st.sidebar.title("Debug Info")
-for debug_msg in st.session_state.debug:
-    st.sidebar.text(debug_msg)
+    # Evaluation stage selection (only show if not already selected)
+    if st.session_state.evaluation_stage is None:
+        stage_options = ["Planning", "Implementation", "Analysis", "Reporting"]
+        st.session_state.evaluation_stage = st.selectbox("At what stage of the evaluation process are you?", stage_options)
+        if st.session_state.evaluation_stage:
+            st.session_state.messages.append({"role": "user", "parts": [{"text": f"I am at the {st.session_state.evaluation_stage} stage of the evaluation process"}]})
+            st.experimental_rerun()
+
+    # Cultural context input (only show if not already provided)
+    if st.session_state.cultural_context is None:
+        st.session_state.cultural_context = st.text_area("Please briefly describe the cultural context of your evaluation project:")
+        if st.session_state.cultural_context:
+            st.session_state.messages.append({"role": "user", "parts": [{"text": f"The cultural context of my evaluation project is: {st.session_state.cultural_context}"}]})
+            st.experimental_rerun()
+
+    # Chat input area
+    user_input = st.chat_input("Type your message here:", key="user_input")
+
+    if user_input:
+        try:
+            st.session_state.messages.append({"role": "user", "parts": [{"text": user_input}]})
+            
+            if st.session_state.chat_session:
+                with st.spinner("EvalBuddy is thinking..."):
+                    response = st.session_state.chat_session.send_message(
+                        {"role": "user", "parts": [{"text": user_input}]}
+                    )
+                    
+                    evalbuddy_response = response.text
+                    
+                    st.session_state.messages.append({"role": "model", "parts": [{"text": evalbuddy_response}]})
+            else:
+                st.error("Chat session was not initialized correctly.")
+        
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+            st.info("Please try again. If the problem persists, try clearing your chat history or reloading the page.")
+
+    # Display chat history
+    for msg in st.session_state.messages:
+        if msg["role"] == "user":
+            st.chat_message("user").write(msg["parts"][0]["text"])
+        else:
+            st.chat_message("assistant").write(msg["parts"][0]["text"])
+
+    # Clear chat history button
+    if st.button("Clear Chat History"):
+        st.session_state.messages = []
+        st.session_state.experience_level = None
+        st.session_state.evaluation_stage = None
+        st.session_state.cultural_context = None
+        st.experimental_rerun()
+
+# Resources & Export Page
+elif page == "Resources & Export":
+    st.markdown('<p class="big-font">Culturally Responsive Evaluation Resources & Export</p>', unsafe_allow_html=True)
+
+    # Display centered image
+    display_centered_image('EvalBuddy.webp', 'Your Culturally Responsive Evaluation Assistant')
+
+    # Resources Section
+    st.subheader("Helpful Resources")
+    st.write("Here are some valuable resources for culturally responsive evaluation:")
+    resources = [
+        "American Evaluation Association's Statement on Cultural Competence in Evaluation",
+        "Culturally Responsive Evaluation: Theory, Practice, and Implications by Stafford Hood et al.",
+        "The Step-by-Step Guide to Evaluation by Holly Lewandowski and Kathryn E. Newcomer",
+        "Culturally Responsive Evaluation and Assessment: Theories, Models, and Tools by Rodney K. Hopson et al."
+    ]
+    for resource in resources:
+        st.write(f"- {resource}")
+
+    # Export Functionality
+    st.subheader("Export Chat History")
+
+    if st.session_state.messages:
+        # Export as JSON
+        if st.button("Export as JSON"):
+            chat_history = json.dumps(st.session_state.messages, indent=2)
+            st.download_button(
+                label="Download Chat History (JSON)",
+                data=chat_history,
+                file_name="evalbuddy_chat_history.json",
+                mime="application/json"
+            )
+        
+        # Export as Excel
+        if st.button("Export as Excel"):
+            df = pd.DataFrame([(msg["role"], msg["parts"][0]["text"]) for msg in st.session_state.messages], 
+                              columns=["Role", "Message"])
+            buffer = BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                df.to_excel(writer, sheet_name='Chat History', index=False)
+            st.download_button(
+                label="Download Chat History (Excel)",
+                data=buffer,
+                file_name="evalbuddy_chat_history.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+    else:
+        st.write("No chat history available to export.")
+
+# Run the app
+if __name__ == "__main__":
+    st.sidebar.write(f"Session started: {st.session_state.session_start_time}")
