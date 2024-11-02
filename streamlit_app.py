@@ -1,5 +1,4 @@
 import streamlit as st
-from PIL import Image
 import google.generativeai as genai
 import json
 from datetime import datetime
@@ -29,10 +28,6 @@ st.markdown("""
     background-color: #f0f0f0;
     margin: 5px 0;
 }
-.centered-image {
-    display: flex;
-    justify-content: center;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -59,7 +54,7 @@ genai.configure(api_key=st.secrets.get("GOOGLE_API_KEY", ""))
 
 # EvalBuddy prompt
 evalbuddy_prompt = """
-You are EvalBuddy, an advanced AI assistant specializing in culturally responsive evaluation for educators, researchers, program managers, and anyone involved in evaluation processes. Your primary role is to guide users through creating comprehensive, culturally sensitive, and effective evaluation plans. Follow these guidelines:
+You are EvalBuddy, an advanced AI assistant specializing in culturally responsive evaluation for educators, researchers, program managers, and anyone involved in evaluation processes. Your primary role is to guide users through creating comprehensive, culturally sensitive, and effective evaluation plans.
 
 [The full prompt as provided in the previous response]
 
@@ -87,22 +82,9 @@ def initialize_chat_session():
     except Exception as e:
         st.error(f"Error during chat initialization: {e}")
 
-# Function to display centered image
-def display_centered_image(image_path, caption):
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        try:
-            image = Image.open(image_path)
-            st.image(image, caption=caption, use_column_width=True)
-        except Exception as e:
-            st.error(f"Error loading image: {e}")
-
 # Home & Chat Page
 if page == "Home & Chat":
     st.markdown('<p class="big-font">Welcome to EvalBuddy!</p>', unsafe_allow_html=True)
-    
-    # Display centered image (replace 'EvalBuddy.webp' with your actual image path)
-    display_centered_image('EvalBuddy.webp', 'Your Culturally Responsive Evaluation Assistant')
     
     st.write("AI-driven assistant to guide you through culturally responsive evaluation.")
     
@@ -110,28 +92,25 @@ if page == "Home & Chat":
     if st.session_state.chat_session is None:
         initialize_chat_session()
 
-    # Experience level selection (only show if not already selected)
+    # Experience level selection
     if st.session_state.experience_level is None:
         experience_options = ["Beginner", "Intermediate", "Advanced"]
         st.session_state.experience_level = st.selectbox("What is your experience level with culturally responsive evaluation?", experience_options)
         if st.session_state.experience_level:
             st.session_state.messages.append({"role": "user", "parts": [{"text": f"My experience level is {st.session_state.experience_level}"}]})
-            st.experimental_rerun()
 
-    # Evaluation stage selection (only show if not already selected)
+    # Evaluation stage selection
     if st.session_state.evaluation_stage is None:
         stage_options = ["Planning", "Implementation", "Analysis", "Reporting"]
         st.session_state.evaluation_stage = st.selectbox("At what stage of the evaluation process are you?", stage_options)
         if st.session_state.evaluation_stage:
             st.session_state.messages.append({"role": "user", "parts": [{"text": f"I am at the {st.session_state.evaluation_stage} stage of the evaluation process"}]})
-            st.experimental_rerun()
 
-    # Cultural context input (only show if not already provided)
+    # Cultural context input
     if st.session_state.cultural_context is None:
         st.session_state.cultural_context = st.text_area("Please briefly describe the cultural context of your evaluation project:")
         if st.session_state.cultural_context:
             st.session_state.messages.append({"role": "user", "parts": [{"text": f"The cultural context of my evaluation project is: {st.session_state.cultural_context}"}]})
-            st.experimental_rerun()
 
     # Chat input area
     user_input = st.chat_input("Type your message here:", key="user_input")
@@ -169,14 +148,10 @@ if page == "Home & Chat":
         st.session_state.experience_level = None
         st.session_state.evaluation_stage = None
         st.session_state.cultural_context = None
-        st.experimental_rerun()
 
 # Resources & Export Page
 elif page == "Resources & Export":
     st.markdown('<p class="big-font">Culturally Responsive Evaluation Resources & Export</p>', unsafe_allow_html=True)
-
-    # Display centered image
-    display_centered_image('EvalBuddy.webp', 'Your Culturally Responsive Evaluation Assistant')
 
     # Resources Section
     st.subheader("Helpful Resources")
