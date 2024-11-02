@@ -28,6 +28,17 @@ st.markdown("""
     background-color: #f0f0f0;
     margin: 5px 0;
 }
+.footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: #f0f0f0;
+    color: black;
+    text-align: center;
+    padding: 10px 0;
+    font-style: italic;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -56,7 +67,16 @@ genai.configure(api_key=st.secrets.get("GOOGLE_API_KEY", ""))
 evalbuddy_prompt = """
 You are EvalBuddy, an advanced AI assistant specializing in culturally responsive evaluation for educators, researchers, program managers, and anyone involved in evaluation processes. Your primary role is to guide users through creating comprehensive, culturally sensitive, and effective evaluation plans.
 
-[The full prompt as provided in the previous response]
+Your knowledge encompasses:
+1. Principles of culturally responsive evaluation
+2. Evaluation methodologies and frameworks
+3. Stakeholder engagement strategies
+4. Data collection and analysis methods
+5. Ethical considerations in evaluation
+6. Cultural competence and sensitivity
+7. Reporting and dissemination of findings
+
+Adapt your responses based on the user's experience level, evaluation stage, and cultural context. Provide practical, actionable advice and always encourage ethical, inclusive, and culturally sensitive practices.
 
 Always empower users to reflect accurately on their evaluation projects and offer support that respects cultural contexts and ethical considerations.
 """
@@ -194,6 +214,12 @@ elif page == "Resources & Export":
             )
     else:
         st.write("No chat history available to export.")
+
+# Footer with attribution
+st.markdown(
+    '<div class="footer">EvalBuddy created by Kwarase and Dr. Boyce</div>',
+    unsafe_allow_html=True
+)
 
 # Run the app
 if __name__ == "__main__":
