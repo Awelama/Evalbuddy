@@ -28,17 +28,6 @@ st.markdown("""
     background-color: #f0f0f0;
     margin: 5px 0;
 }
-.footer {
-    position: fixed;
-    left: 0;
-    bottom: 0;
-    width: 100%;
-    background-color: #f0f0f0;
-    color: black;
-    text-align: center;
-    padding: 10px 0;
-    font-style: italic;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -105,6 +94,9 @@ def initialize_chat_session():
 # Home & Chat Page
 if page == "Home & Chat":
     st.markdown('<p class="big-font">Welcome to EvalBuddy!</p>', unsafe_allow_html=True)
+    
+    # Add the attribution line here
+    st.markdown('<p style="text-align: center; font-style: italic;">Created by Kwarase and Dr. Boyce</p>', unsafe_allow_html=True)
     
     st.write("AI-driven assistant to guide you through culturally responsive evaluation.")
     
@@ -214,12 +206,6 @@ elif page == "Resources & Export":
             )
     else:
         st.write("No chat history available to export.")
-
-# Footer with attribution
-st.markdown(
-    '<div class="footer">EvalBuddy created by Kwarase and Dr. Boyce</div>',
-    unsafe_allow_html=True
-)
 
 # Run the app
 if __name__ == "__main__":
