@@ -151,7 +151,7 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     st.markdown('<p class="big-font">Welcome to EvalBuddy!</p>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; font-style: italic;">Created by Kwarase and Dr. Boyce</p>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; font-style: italic;">Created by Prince Awelama Kwarase and Dr. Ayesha Boyce</p>', unsafe_allow_html=True)
     st.write("AI-driven assistant to guide you through culturally responsive evaluation.")
     
     # Initialize the session if not already started
