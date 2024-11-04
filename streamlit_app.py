@@ -11,23 +11,74 @@ st.set_page_config(page_title="EvalBuddy", page_icon="📊", layout="wide")
 # Custom CSS for styling
 st.markdown("""
 <style>
-.big-font {
-    font-size:30px !important;
-    font-weight: bold;
-    text-align: center;
-}
-.user-message {
-    padding: 10px;
-    border-radius: 15px;
-    background-color: #e6f3ff;
-    margin: 5px 0;
-}
-.bot-message {
-    padding: 10px;
-    border-radius: 15px;
-    background-color: #f0f0f0;
-    margin: 5px 0;
-}
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .stApp {
+        background-color: #ffffff;
+    }
+    
+    .stButton>button {
+        background-color: #007bff;
+        color: white;
+    }
+
+    .big-font {
+        font-size:30px !important;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .user-bubble {
+        background-color: #007bff;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 20px;
+        margin: 5px 0;
+        max-width: 70%;
+        float: right;
+        clear: both;
+    }
+
+    .bot-bubble {
+        background-color: #f1f3f5;
+        color: black;
+        padding: 10px 15px;
+        border-radius: 20px;
+        margin: 5px 0;
+        max-width: 70%;
+        float: left;
+        clear: both;
+    }
+
+    .floating-input {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        padding: 10px;
+        border-radius: 20px;
+        border: 1px solid #ccc;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    [data-testid="stSidebar"][aria-expanded="true"] > div:first-child {
+        width: 300px;
+    }
+    [data-testid="stSidebar"][aria-expanded="false"] > div:first-child {
+        width: 300px;
+        margin-left: -300px;
+    }
+
+    @media (max-width: 768px) {
+        .floating-input {
+            width: 90%;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -46,8 +97,12 @@ if "cultural_context" not in st.session_state:
     st.session_state.cultural_context = None
 
 # Sidebar for navigation
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Home & Chat", "Resources & Export"])
+with st.sidebar:
+    st.title("EvalBuddy")
+    st.markdown('<i class="fas fa-plus"></i> New Chat', unsafe_allow_html=True)
+    st.button("Home & Chat")
+    st.button("Resources & Export")
+    st.write(f"Session started: {st.session_state.session_start_time}")
 
 # Initialize GenerativeAI client
 genai.configure(api_key=st.secrets.get("GOOGLE_API_KEY", ""))
@@ -91,41 +146,29 @@ def initialize_chat_session():
     except Exception as e:
         st.error(f"Error during chat initialization: {e}")
 
-# Home & Chat Page
-if page == "Home & Chat":
+# Main content area
+col1, col2 = st.columns([2, 1])
+
+with col1:
     st.markdown('<p class="big-font">Welcome to EvalBuddy!</p>', unsafe_allow_html=True)
-    
-    # Add the attribution line here
     st.markdown('<p style="text-align: center; font-style: italic;">Created by Kwarase and Dr. Boyce</p>', unsafe_allow_html=True)
-    
     st.write("AI-driven assistant to guide you through culturally responsive evaluation.")
     
     # Initialize the session if not already started
     if st.session_state.chat_session is None:
         initialize_chat_session()
 
-    # Experience level selection
-    if st.session_state.experience_level is None:
-        experience_options = ["Beginner", "Intermediate", "Advanced"]
-        st.session_state.experience_level = st.selectbox("What is your experience level with culturally responsive evaluation?", experience_options)
-        if st.session_state.experience_level:
-            st.session_state.messages.append({"role": "user", "parts": [{"text": f"My experience level is {st.session_state.experience_level}"}]})
-
-    # Evaluation stage selection
-    if st.session_state.evaluation_stage is None:
-        stage_options = ["Planning", "Implementation", "Analysis", "Reporting"]
-        st.session_state.evaluation_stage = st.selectbox("At what stage of the evaluation process are you?", stage_options)
-        if st.session_state.evaluation_stage:
-            st.session_state.messages.append({"role": "user", "parts": [{"text": f"I am at the {st.session_state.evaluation_stage} stage of the evaluation process"}]})
-
-    # Cultural context input
-    if st.session_state.cultural_context is None:
-        st.session_state.cultural_context = st.text_area("Please briefly describe the cultural context of your evaluation project:")
-        if st.session_state.cultural_context:
-            st.session_state.messages.append({"role": "user", "parts": [{"text": f"The cultural context of my evaluation project is: {st.session_state.cultural_context}"}]})
+    # Display chat history
+    for msg in st.session_state.messages:
+        if msg["role"] == "user":
+            st.markdown(f'<div class="user-bubble">{msg["parts"][0]["text"]}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="bot-bubble">{msg["parts"][0]["text"]}</div>', unsafe_allow_html=True)
 
     # Chat input area
-    user_input = st.chat_input("Type your message here:", key="user_input")
+    user_input = st.text_input("", key="user_input", placeholder="Type your message here...", 
+                               help="Press Enter to send", label_visibility="collapsed")
+    st.markdown('<div class="floating-input"></div>', unsafe_allow_html=True)
 
     if user_input:
         try:
@@ -147,13 +190,6 @@ if page == "Home & Chat":
             st.error(f"An error occurred: {str(e)}")
             st.info("Please try again. If the problem persists, try clearing your chat history or reloading the page.")
 
-    # Display chat history
-    for msg in st.session_state.messages:
-        if msg["role"] == "user":
-            st.chat_message("user").write(msg["parts"][0]["text"])
-        else:
-            st.chat_message("assistant").write(msg["parts"][0]["text"])
-
     # Clear chat history button
     if st.button("Clear Chat History"):
         st.session_state.messages = []
@@ -161,9 +197,26 @@ if page == "Home & Chat":
         st.session_state.evaluation_stage = None
         st.session_state.cultural_context = None
 
-# Resources & Export Page
-elif page == "Resources & Export":
-    st.markdown('<p class="big-font">Culturally Responsive Evaluation Resources & Export</p>', unsafe_allow_html=True)
+with col2:
+    # Experience level selection
+    if st.session_state.experience_level is None:
+        experience_options = ["Beginner", "Intermediate", "Advanced"]
+        st.session_state.experience_level = st.selectbox("What is your experience level with culturally responsive evaluation?", experience_options)
+        if st.session_state.experience_level:
+            st.session_state.messages.append({"role": "user", "parts": [{"text": f"My experience level is {st.session_state.experience_level}"}]})
+
+    # Evaluation stage selection
+    if st.session_state.evaluation_stage is None:
+        stage_options = ["Planning", "Implementation", "Analysis", "Reporting"]
+        st.session_state.evaluation_stage = st.selectbox("At what stage of the evaluation process are you?", stage_options)
+        if st.session_state.evaluation_stage:
+            st.session_state.messages.append({"role": "user", "parts": [{"text": f"I am at the {st.session_state.evaluation_stage} stage of the evaluation process"}]})
+
+    # Cultural context input
+    if st.session_state.cultural_context is None:
+        st.session_state.cultural_context = st.text_area("Please briefly describe the cultural context of your evaluation project:")
+        if st.session_state.cultural_context:
+            st.session_state.messages.append({"role": "user", "parts": [{"text": f"The cultural context of my evaluation project is: {st.session_state.cultural_context}"}]})
 
     # Resources Section
     st.subheader("Helpful Resources")
