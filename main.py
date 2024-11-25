@@ -3,6 +3,7 @@ import google.generativeai as genai
 from pages import home_page, resources_page, evaluation_tools_page
 from helpers import load_text_file, process_pdf
 from PIL import Image
+import os
 
 # Streamlit configuration
 st.set_page_config(page_title="EvalBuddy", layout="wide", initial_sidebar_state="expanded")
@@ -42,12 +43,22 @@ st.session_state.system_prompt = system_prompt
 
 # Sidebar
 with st.sidebar:
-    # Load and display the logo
+    # Add logo
     try:
-        logo = Image.open('logo.webp')  # Adjust the path if needed
-        st.image(logo, width=200)  # Adjust width as needed
+        # Try different file paths
+        logo_paths = ['logo.webp', 'logo.png', 'logo.jpg', 'images/logo.webp', 'images/logo.png', 'images/logo.jpg']
+        logo = None
+        for path in logo_paths:
+            if os.path.exists(path):
+                logo = Image.open(path)
+                break
+        
+        if logo:
+            st.image(logo, width=200)
+        else:
+            st.error("Logo file not found. Please check the file path.")
     except Exception as e:
-        st.error(f"Unable to load logo: {e}")
+        st.error(f"Error loading logo: {e}")
 
     st.title("EvalBuddy")
     pages = {
