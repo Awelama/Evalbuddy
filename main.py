@@ -79,7 +79,11 @@ def home_page():
                 st.session_state.chat_session = model.start_chat(history=initial_messages)
 
             try:
-                response = st.session_state.chat_session.send_message(current_message["content"])
+                # Only include PDF content if it's available
+                if st.session_state.pdf_content:
+                    response = st.session_state.chat_session.send_message(f"Considering the previously uploaded PDF content, please respond to this user query: {current_message['content']}")
+                else:
+                    response = st.session_state.chat_session.send_message(current_message['content'])
 
                 full_response = response.text
                 message_placeholder.markdown(full_response)
