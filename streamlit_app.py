@@ -1,127 +1,162 @@
 import streamlit as st
 import google.generativeai as genai
-from datetime import datetime
-import pandas as pd
-import io
-from io import BytesIO
-import json
+from PyPDF2 import PdfReader
+from PIL import Image
 
-# Page configuration
-st.set_page_config(page_title="EvalBuddy", layout="wide", initial_sidebar_state="expanded")
+# Streamlit configuration
+st.set_page_config(page_title="Welcome to Evalbuddy!", layout="wide")
 
-# CSS styling (unchanged)
-st.markdown("""
-<style>
-    # ... (keep the existing CSS)
-</style>
-""", unsafe_allow_html=True)
+# Display image
+# This code attempts to open and display an image file named 'Build2.png'.
+# If successful, it shows the image with a caption. If there's an error, it displays an error message instead.
+# You can customize this by changing the image file name and path. Supported image types include .png, .jpg, .jpeg, and .gif.
+# To use a different image, replace 'Build2.png' with your desired image file name (e.g., 'my_custom_image.jpg').
+image_path = 'Grantbuddy.webp'
+try:
+    image = Image.open(image_path)
+    st.image(image, caption='Created by Awelama (2024)', use_column_width=True)
+except Exception as e:
+    st.error(f"Error loading image: {e}")
 
-# Initialize session state variables
-if "chat_session" not in st.session_state:
-    st.session_state.chat_session = None
+# Title and BotDescription 
+# You can customize the title, description, and caption by modifying the text within the quotes.
+st.title("Welcome to Evalbuddy!")
+st.write("EvalBuddy is an advanced AI assistant specializing in guiding users through all forms of evaluation, including formative, summative, developmental, and impact evaluations. While EvalBuddy supports a broad range of evaluation processes, it maintains a foundational emphasis on cultural considerations, recognizing that culture influences every aspect of societies, programs, and their outcomes. EvalBuddy's primary role is to help users design effective, inclusive, and contextually appropriate evaluation plans tailored to their specific goals, contexts, and populations")
+st.caption("Evalbuddy can make mistakes. Please double-check all responses.")
+
+# Initialize Gemini client
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+
+# Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "session_start_time" not in st.session_state:
-    st.session_state.session_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+if "model_name" not in st.session_state:
+    st.session_state.model_name = "gemini-1.5-pro-002"
+if "temperature" not in st.session_state:
+    st.session_state.temperature = 0.5
+if "debug" not in st.session_state:
+    st.session_state.debug = []
+if "pdf_content" not in st.session_state:
+    st.session_state.pdf_content = ""
+if "chat_session" not in st.session_state:
+    st.session_state.chat_session = None
 
-# Initialize GenerativeAI
-@st.cache_resource
-def get_genai_model():
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    return genai.GenerativeModel(
-        model_name="gemini-1.5-pro",
-        generation_config={
-            "temperature": 0.7,
-            "max_output_tokens": 1000
-        }
+# Sidebar for model and temperature selection
+with st.sidebar:
+    st.title("Settings")
+    st.caption("Note: Gemini-1.5-pro-002 can only handle 2 requests per minute, gemini-1.5-flash-002 can handle 15 per minute")
+    model_option = st.selectbox(
+        "Select Model:", ["gemini-1.5-flash-002", "gemini-1.5-pro-002"]
     )
+    if model_option != st.session_state.model_name:
+        st.session_state.model_name = model_option
+        st.session_state.messages = []
+        st.session_state.chat_session = None
+    temperature = st.slider("Temperature:", 0.0, 1.0, st.session_state.temperature, 0.1)
+    st.session_state.temperature = temperature
+    uploaded_pdf = st.file_uploader("Upload PDF", type=["pdf"])
+    clear_button = st.button("Clear Chat")
 
-# EvalBuddy prompt (unchanged)
-evalbuddy_prompt = """
-# ... (keep the existing prompt)
-"""
-
-# Function to initialize chat session
-@st.cache_resource
-def initialize_chat_session():
+# Process uploaded PDF
+if uploaded_pdf:
     try:
-        model = get_genai_model()
-        
-        initial_messages = [
-            {"role": "user", "parts": [{"text": evalbuddy_prompt}]},
-            {"role": "model", "parts": [{"text": "Understood. I'm ready to assist with culturally responsive evaluation. How may I help you today?"}]}
-        ]
-
-        return model.start_chat(history=initial_messages)
-        
+        pdf_reader = PdfReader(uploaded_pdf)
+        pdf_text = ""
+        for page in pdf_reader.pages:
+            pdf_text += page.extract_text() + "\n"
+        st.session_state.pdf_content = pdf_text
+        st.session_state.debug.append(f"PDF processed: {len(pdf_text)} characters")
+        # Reset chat session when new PDF is uploaded
+        st.session_state.chat_session = None
     except Exception as e:
-        st.error(f"An error occurred during chat initialization: {str(e)}")
+        st.error(f"Error processing PDF: {e}")
+        st.session_state.debug.append(f"PDF processing error: {e}")
 
-# Sidebar navigation
-page = st.sidebar.radio("Navigation", ["Home & Chat", "Resources", "Evaluation Tools"])
+# Clear chat function
+if clear_button:
+    st.session_state.messages = []
+    st.session_state.debug = []
+    st.session_state.pdf_content = ""
+    st.session_state.chat_session = None
+    st.rerun()
 
-# Main content area
-if page == "Home & Chat":
-    st.title("EvalBuddy: Your AI Evaluation Assistant")
-    st.markdown('<p class="big-font">Welcome to EvalBuddy!</p>', unsafe_allow_html=True)
-    st.write("Let's design inclusive, contextually appropriate evaluations together.")
-    
-    # Initialize chat session if not already done
-    if st.session_state.chat_session is None:
-        st.session_state.chat_session = initialize_chat_session()
+# Load system prompt
+def load_text_file(file_path):
+    try:
+        with open(file_path, 'r') as file:
+            return file.read()
+    except Exception as e:
+        st.error(f"Error loading text file: {e}")
+        return ""
 
-    # Display chat history with pagination
-    messages_per_page = 10
-    page_number = st.number_input("Page", min_value=1, max_value=max(1, len(st.session_state.messages) // messages_per_page + 1), value=1)
-    start_idx = (page_number - 1) * messages_per_page
-    end_idx = start_idx + messages_per_page
+system_prompt = load_text_file('instructions.txt')
 
-    chat_placeholder = st.empty()
-    with chat_placeholder.container():
-        for msg in st.session_state.messages[start_idx:end_idx]:
-            if msg["role"] == "user":
-                st.markdown(f'<div class="user-bubble">{msg["parts"][0]["text"]}</div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="bot-bubble">{msg["parts"][0]["text"]}</div>', unsafe_allow_html=True)
+# Display chat messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-    # Chat input area
-    user_input = st.text_input("", placeholder="Type your message here. Press Enter to send.", key="chat_input")
+# User input
+# The placeholder text "Your message:" can be customized to any desired prompt, e.g., "Message Creative Assistant...".
+user_input = st.chat_input("Your message:")
 
-    if user_input:
-        try:
-            st.session_state.messages.append({"role": "user", "parts": [{"text": user_input}]})
+if user_input:
+    # Add user message to chat history
+    current_message = {"role": "user", "content": user_input}
+    st.session_state.messages.append(current_message)
+
+    with st.chat_message("user"):
+        st.markdown(current_message["content"])
+
+    # Generate and display assistant response
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+
+        # Prepare messages for Gemini API
+        if st.session_state.chat_session is None:
+            generation_config = {
+                "temperature": st.session_state.temperature,
+                "top_p": 0.95,
+                "top_k": 40,
+                "max_output_tokens": 8192,
+            }
+            model = genai.GenerativeModel(
+                model_name=st.session_state.model_name,
+                generation_config=generation_config,
+            )
             
-            if st.session_state.chat_session:
-                with st.spinner("EvalBuddy is thinking..."):
-                    response = st.session_state.chat_session.send_message(
-                        {"role": "user", "parts": [{"text": user_input}]}
-                    )
-                    
-                    evalbuddy_response = response.text
-                    
-                    st.session_state.messages.append({"role": "model", "parts": [{"text": evalbuddy_response}]})
-                
-                # Update chat display
-                chat_placeholder.empty()
-                with chat_placeholder.container():
-                    for msg in st.session_state.messages[-messages_per_page:]:
-                        if msg["role"] == "user":
-                            st.markdown(f'<div class="user-bubble">{msg["parts"][0]["text"]}</div>', unsafe_allow_html=True)
-                        else:
-                            st.markdown(f'<div class="bot-bubble">{msg["parts"][0]["text"]}</div>', unsafe_allow_html=True)
-            else:
-                st.error("Chat session was not properly initialized. Please try refreshing the page.")
+            # Initialize chat with system prompt and PDF content
+            initial_messages = [
+                {"role": "user", "parts": [f"System: {system_prompt}"]},
+                {"role": "model", "parts": ["Understood. I will follow these instructions."]},
+            ]
+            
+            if st.session_state.pdf_content:
+                initial_messages.extend([
+                    {"role": "user", "parts": [f"The following is the content of an uploaded PDF document. Please consider this information when responding to user queries:\n\n{st.session_state.pdf_content}"]},
+                    {"role": "model", "parts": ["I have received and will consider the PDF content in our conversation."]}
+                ])
+            
+            st.session_state.chat_session = model.start_chat(history=initial_messages)
+
+        # Generate response with error handling
+        try:
+            response = st.session_state.chat_session.send_message(current_message["content"])
+
+            full_response = response.text
+            message_placeholder.markdown(full_response)
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+            st.session_state.debug.append("Assistant response generated")
+
         except Exception as e:
-            st.error(f"An error occurred: {str(e)}. Please try again. If the problem persists, try clearing your chat history or reloading the page.")
+            st.error(f"An error occurred while generating the response: {e}")
+            st.session_state.debug.append(f"Error: {e}")
 
-# ... (keep the Resources and Evaluation Tools sections as they were)
+    st.rerun()
 
-# Common elements across all pages
-st.sidebar.write(f"Session started: {st.session_state.session_start_time}")
+# Debug information
+# You can remove this by adding # in front of each line
 
-# Export functionality (unchanged)
-# ... (keep the export functionality as it was)
-
-# Run the app
-if __name__ == "__main__":
-    st.sidebar.write(f"Session started: {st.session_state.session_start_time}")
+st.sidebar.title("Debug Info")
+for debug_msg in st.session_state.debug:
+    st.sidebar.text(debug_msg)
