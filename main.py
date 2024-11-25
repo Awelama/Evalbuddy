@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 from pages import home_page, resources_page, evaluation_tools_page
 from helpers import load_text_file, process_pdf
+from PIL import Image
 
 # Streamlit configuration
 st.set_page_config(page_title="EvalBuddy", layout="wide", initial_sidebar_state="expanded")
@@ -41,6 +42,10 @@ st.session_state.system_prompt = system_prompt
 
 # Sidebar
 with st.sidebar:
+    # Add logo
+    logo = Image.open('logo.webp')  # Adjust the path if needed
+    st.image(logo, width=200)  # Adjust width as needed
+
     st.title("EvalBuddy")
     pages = {
         "Chat": home_page,
