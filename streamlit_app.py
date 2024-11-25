@@ -2,21 +2,69 @@ import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
 from PIL import Image
+import plotly.graph_objs as go
+import networkx as nx
+import json
 
 # Streamlit configuration
 st.set_page_config(page_title="Welcome to Evalbuddy!", layout="wide", initial_sidebar_state="expanded")
 
-# Display image
-# This code attempts to open and display an image file named 'Build2.png'.
-# If successful, it shows the image with a caption. If there's an error, it displays an error message instead.
-# You can customize this by changing the image file name and path. Supported image types include .png, .jpg, .jpeg, and .gif.
-# To use a different image, replace 'Build2.png' with your desired image file name (e.g., 'my_custom_image.jpg').
+# Multi-page Application
+def home_page():
+    st.title("Welcome to Evalbuddy!")
+    st.write("EvalBuddy is an advanced AI assistant specializing in guiding users through all forms of evaluation, including formative, summative, developmental, and impact evaluations. While EvalBuddy supports a broad range of evaluation processes, it maintains a foundational emphasis on cultural considerations, recognizing that culture influences every aspect of societies, programs, and their outcomes. EvalBuddy's primary role is to help users design effective, inclusive, and contextually appropriate evaluation plans tailored to their specific goals, contexts, and populations")
+    st.caption("Evalbuddy can make mistakes. Please double-check all responses.")
 
-# Title and BotDescription 
-# You can customize the title, description, and caption by modifying the text within the quotes.
-st.title("Welcome to Evalbuddy!")
-st.write("EvalBuddy is an advanced AI assistant specializing in guiding users through all forms of evaluation, including formative, summative, developmental, and impact evaluations. While EvalBuddy supports a broad range of evaluation processes, it maintains a foundational emphasis on cultural considerations, recognizing that culture influences every aspect of societies, programs, and their outcomes. EvalBuddy's primary role is to help users design effective, inclusive, and contextually appropriate evaluation plans tailored to their specific goals, contexts, and populations")
-st.caption("Evalbuddy can make mistakes. Please double-check all responses.")
+def resources_page():
+    st.title("Evaluation Resources")
+    st.write("Here you can find various resources related to evaluation.")
+    
+    # Resource Recommendation Engine
+    st.subheader("Resource Recommendations")
+    user_context = st.text_area("Describe your evaluation context:")
+    if st.button("Get Recommendations"):
+        recommendations = recommend_resources(user_context)
+        for rec in recommendations:
+            st.write(f"- {rec}")
+
+def evaluation_tools_page():
+    st.title("Evaluation Tools")
+    
+    # Interactive Evaluation Framework
+    st.subheader("Logic Model Builder")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        inputs = st.text_area("Inputs")
+    with col2:
+        activities = st.text_area("Activities")
+    with col3:
+        outputs = st.text_area("Outputs")
+    with col4:
+        outcomes = st.text_area("Outcomes")
+    with col5:
+        impact = st.text_area("Impact")
+    
+    if st.button("Generate Logic Model"):
+        generate_logic_model(inputs, activities, outputs, outcomes, impact)
+    
+    # Data Visualization
+    st.subheader("Data Visualization")
+    chart_type = st.selectbox("Select chart type", ["Bar", "Line", "Scatter"])
+    x_data = st.text_input("Enter x-axis data (comma-separated)")
+    y_data = st.text_input("Enter y-axis data (comma-separated)")
+    if st.button("Generate Chart"):
+        generate_chart(chart_type, x_data, y_data)
+    
+    # Stakeholder Mapping Tool
+    st.subheader("Stakeholder Mapping")
+    stakeholder = st.text_input("Enter stakeholder name")
+    influence = st.slider("Influence", 0, 10, 5)
+    interest = st.slider("Interest", 0, 10, 5)
+    if st.button("Add Stakeholder"):
+        add_stakeholder(stakeholder, influence, interest)
+    
+    if "stakeholders" in st.session_state:
+        generate_stakeholder_map()
 
 # Initialize Gemini client
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
@@ -34,18 +82,21 @@ if "pdf_content" not in st.session_state:
     st.session_state.pdf_content = ""
 if "chat_session" not in st.session_state:
     st.session_state.chat_session = None
+if "progress" not in st.session_state:
+    st.session_state.progress = 0
+if "stakeholders" not in st.session_state:
+    st.session_state.stakeholders = []
 
-# TODO: Implement multi-page structure
-# pages = {
-#     "Home": home_page,
-#     "Resources": resources_page,
-#     "Evaluation Tools": evaluation_tools_page
-# }
-# selected_page = st.sidebar.selectbox("Navigate", list(pages.keys()))
-# pages[selected_page]()
-
-# Sidebar for model and temperature selection
+# Sidebar for navigation and settings
 with st.sidebar:
+    st.title("Navigation")
+    pages = {
+        "Home": home_page,
+        "Resources": resources_page,
+        "Evaluation Tools": evaluation_tools_page
+    }
+    selected_page = st.selectbox("Go to", list(pages.keys()))
+    
     st.title("Settings")
     st.caption("Note: Gemini-1.5-pro-002 can only handle 2 requests per minute, gemini-1.5-flash-002 can handle 15 per minute")
     model_option = st.selectbox(
@@ -60,19 +111,31 @@ with st.sidebar:
     uploaded_pdf = st.file_uploader("Upload PDF", type=["pdf"])
     clear_button = st.button("Clear Chat")
 
-    # TODO: Implement customizable themes
-    # theme = st.radio("Theme", ["Light", "Dark", "Cultural"])
-    # if theme == "Light":
-    #     # Apply light theme
-    # elif theme == "Dark":
-    #     # Apply dark theme
-    # else:
-    #     # Apply cultural theme
+    # Customizable Themes
+    theme = st.radio("Theme", ["Light", "Dark"])
+    if theme == "Light":
+        st.markdown("""
+            <style>
+            .stApp {
+                background-color: white;
+                color: black;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+            <style>
+            .stApp {
+                background-color: #1E1E1E;
+                color: white;
+            }
+            </style>
+            """, unsafe_allow_html=True)
 
-# TODO: Implement progress tracking
-# progress = st.progress(0)
-# st.write("Evaluation Progress")
-# progress.progress(50)  # Update this based on user's progress
+# Progress Tracking
+st.sidebar.title("Evaluation Progress")
+progress_bar = st.sidebar.progress(st.session_state.progress)
+st.sidebar.button("Update Progress", on_click=lambda: setattr(st.session_state, 'progress', min(st.session_state.progress + 10, 100)))
 
 # Process uploaded PDF
 if uploaded_pdf:
@@ -83,7 +146,6 @@ if uploaded_pdf:
             pdf_text += page.extract_text() + "\n"
         st.session_state.pdf_content = pdf_text
         st.session_state.debug.append(f"PDF processed: {len(pdf_text)} characters")
-        # Reset chat session when new PDF is uploaded
         st.session_state.chat_session = None
     except Exception as e:
         st.error(f"Error processing PDF: {e}")
@@ -114,22 +176,18 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # User input
-# The placeholder text "Your message:" can be customized to any desired prompt, e.g., "Message Creative Assistant...".
 user_input = st.chat_input("Your message:")
 
 if user_input:
-    # Add user message to chat history
     current_message = {"role": "user", "content": user_input}
     st.session_state.messages.append(current_message)
 
     with st.chat_message("user"):
         st.markdown(current_message["content"])
 
-    # Generate and display assistant response
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
 
-        # Prepare messages for Gemini API
         if st.session_state.chat_session is None:
             generation_config = {
                 "temperature": st.session_state.temperature,
@@ -142,7 +200,6 @@ if user_input:
                 generation_config=generation_config,
             )
             
-            # Initialize chat with system prompt and PDF content
             initial_messages = [
                 {"role": "user", "parts": [f"System: {system_prompt}"]},
                 {"role": "model", "parts": ["Understood. I will follow these instructions."]},
@@ -156,7 +213,6 @@ if user_input:
             
             st.session_state.chat_session = model.start_chat(history=initial_messages)
 
-        # Generate response with error handling
         try:
             response = st.session_state.chat_session.send_message(current_message["content"])
 
@@ -172,39 +228,150 @@ if user_input:
     st.rerun()
 
 # Debug information
-# You can remove this by adding # in front of each line
-
 st.sidebar.title("Debug Info")
 for debug_msg in st.session_state.debug:
     st.sidebar.text(debug_msg)
 
-# TODO: Implement interactive evaluation framework
-# st.subheader("Interactive Evaluation Framework")
-# # Add interactive diagram (e.g., Logic Model or Theory of Change)
+# Evaluation Plan Generator
+def generate_evaluation_plan():
+    plan = "Evaluation Plan:\n\n"
+    for msg in st.session_state.messages:
+        if msg["role"] == "user":
+            plan += f"User Input: {msg['content']}\n"
+        else:
+            plan += f"EvalBuddy Response: {msg['content']}\n"
+    plan += "\nBased on the conversation above, here's a basic evaluation plan:\n"
+    # Add more sophisticated plan generation logic here
+    return plan
 
-# TODO: Implement evaluation plan generator
-# if st.button("Generate Evaluation Plan"):
-#     # Generate plan based on chat history and user inputs
-#     pass
+if st.button("Generate Evaluation Plan"):
+    plan = generate_evaluation_plan()
+    st.text_area("Generated Evaluation Plan", plan, height=300)
 
-# TODO: Implement data visualization
-# st.subheader("Data Visualization")
-# # Add options for creating simple charts or graphs
+# Helper functions for new features
+def recommend_resources(context):
+    # Placeholder for resource recommendation logic
+    return [
+        "Resource 1: Introduction to Program Evaluation",
+        "Resource 2: Cultural Considerations in Evaluation",
+        "Resource 3: Data Collection Methods for Impact Assessment"
+    ]
 
-# TODO: Implement stakeholder mapping tool
-# st.subheader("Stakeholder Mapping")
-# # Add interactive tool for mapping and categorizing stakeholders
+def generate_logic_model(inputs, activities, outputs, outcomes, impact):
+    fig = go.Figure(data=[go.Sankey(
+        node = dict(
+          pad = 15,
+          thickness = 20,
+          line = dict(color = "black", width = 0.5),
+          label = ["Inputs", "Activities", "Outputs", "Outcomes", "Impact"],
+          color = "blue"
+        ),
+        link = dict(
+          source = [0, 1, 2, 3],
+          target = [1, 2, 3, 4],
+          value = [1, 1, 1, 1]
+      ))])
 
-# TODO: Implement resource recommendation engine
-# def recommend_resources(context):
-#     # Implement sophisticated resource recommendation logic
-#     pass
+    fig.update_layout(title_text="Logic Model", font_size=10)
+    st.plotly_chart(fig)
 
-# TODO: Implement contextual help
-# Add hover-over tooltips or expandable information boxes for evaluation terminology and concepts
+def generate_chart(chart_type, x_data, y_data):
+    x = [float(i) for i in x_data.split(',')]
+    y = [float(i) for i in y_data.split(',')]
+    
+    if chart_type == "Bar":
+        fig = go.Figure(data=[go.Bar(x=x, y=y)])
+    elif chart_type == "Line":
+        fig = go.Figure(data=[go.Scatter(x=x, y=y, mode='lines')])
+    else:
+        fig = go.Figure(data=[go.Scatter(x=x, y=y, mode='markers')])
+    
+    st.plotly_chart(fig)
 
-# TODO: Improve session persistence
-# Implement better session state management for resuming conversations
+def add_stakeholder(name, influence, interest):
+    st.session_state.stakeholders.append({"name": name, "influence": influence, "interest": interest})
 
-# TODO: Implement performance optimization
-# Add caching and lazy loading for improved app performance
+def generate_stakeholder_map():
+    G = nx.Graph()
+    for s in st.session_state.stakeholders:
+        G.add_node(s["name"], influence=s["influence"], interest=s["interest"])
+    
+    pos = nx.spring_layout(G)
+    
+    edge_x = []
+    edge_y = []
+    for edge in G.edges():
+        x0, y0 = pos[edge[0]]
+        x1, y1 = pos[edge[1]]
+        edge_x.extend([x0, x1, None])
+        edge_y.extend([y0, y1, None])
+
+    edge_trace = go.Scatter(
+        x=edge_x, y=edge_y,
+        line=dict(width=0.5, color='#888'),
+        hoverinfo='none',
+        mode='lines')
+
+    node_x = []
+    node_y = []
+    for node in G.nodes():
+        x, y = pos[node]
+        node_x.append(x)
+        node_y.append(y)
+
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode='markers',
+        hoverinfo='text',
+        marker=dict(
+            showscale=True,
+            colorscale='YlGnBu',
+            size=10,
+            colorbar=dict(
+                thickness=15,
+                title='Node Connections',
+                xanchor='left',
+                titleside='right'
+            )
+        )
+    )
+
+    fig = go.Figure(data=[edge_trace, node_trace],
+                    layout=go.Layout(
+                        title='Stakeholder Map',
+                        showlegend=False,
+                        hovermode='closest',
+                        margin=dict(b=20,l=5,r=5,t=40),
+                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+                    )
+    
+    st.plotly_chart(fig)
+
+# Contextual Help
+with st.expander("Evaluation Terminology"):
+    st.write("""
+    - Formative Evaluation: Assessment conducted during program development.
+    - Summative Evaluation: Assessment of program outcomes and impact.
+    - Logic Model: Visual representation of program inputs, activities, outputs, and outcomes.
+    - Stakeholder: Individual or group with interest in the evaluation.
+    """)
+
+# Run the selected page
+pages[selected_page]()
+
+# Session Persistence
+if st.button("Save Session"):
+    session_data = {
+        "messages": st.session_state.messages,
+        "progress": st.session_state.progress,
+        "stakeholders": st.session_state.stakeholders
+    }
+    st.download_button(
+        label="Download Session Data",
+        data=json.dumps(session_data),
+        file_name="evalbuddy_session.json",
+        mime="application/json"
+    )
+
+uploaded_session = st.file_uploader("Upload Previous Session", type=["json"])
