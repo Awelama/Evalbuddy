@@ -13,7 +13,7 @@ genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "model_name" not in st.session_state:
-    st.session_state.model_name = "gemini-1.5-pro-002"
+    st.session_state.model_name = "gemini-pro"
 if "temperature" not in st.session_state:
     st.session_state.temperature = 0.5
 if "debug" not in st.session_state:
