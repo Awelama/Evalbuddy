@@ -11,12 +11,6 @@ st.set_page_config(page_title="Welcome to Evalbuddy!", layout="wide")
 # If successful, it shows the image with a caption. If there's an error, it displays an error message instead.
 # You can customize this by changing the image file name and path. Supported image types include .png, .jpg, .jpeg, and .gif.
 # To use a different image, replace 'Build2.png' with your desired image file name (e.g., 'my_custom_image.jpg').
-image_path = 'Grantbuddy.webp'
-try:
-    image = Image.open(image_path)
-    st.image(image, caption='Created by Awelama (2024)', use_column_width=True)
-except Exception as e:
-    st.error(f"Error loading image: {e}")
 
 # Title and BotDescription 
 # You can customize the title, description, and caption by modifying the text within the quotes.
