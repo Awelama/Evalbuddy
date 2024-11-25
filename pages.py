@@ -22,12 +22,9 @@ def stream_response(response: GenerateContentResponse):
         yield chunk.text
 
 def home_page():
-    st.title("Welcome to Evalbuddy!")
-    st.write("EvalBuddy is an advanced AI assistant specializing in guiding users through all forms of evaluation, including formative, summative, developmental, and impact evaluations.")
-    st.caption("Evalbuddy can make mistakes. Please double-check all responses.")
+    st.header("Chat with EvalBuddy")
+    st.caption("EvalBuddy is an AI assistant for evaluation guidance. It can make mistakes, so please verify important information.")
 
-    # Chat interface
-    st.subheader("Chat with EvalBuddy")
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
@@ -74,8 +71,7 @@ def home_page():
         st.rerun()
 
 def resources_page():
-    st.title("Evaluation Resources")
-    st.write("Here you can find various resources related to evaluation.")
+    st.header("Evaluation Resources")
     
     user_context = st.text_area("Describe your evaluation context:")
     if st.button("Get Recommendations"):
@@ -84,40 +80,42 @@ def resources_page():
             st.write(f"- {rec}")
 
 def evaluation_tools_page():
-    st.title("Evaluation Tools")
+    st.header("Evaluation Tools")
     
-    # Logic Model Builder
-    st.subheader("Logic Model Builder")
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        inputs = st.text_area("Inputs")
-    with col2:
-        activities = st.text_area("Activities")
-    with col3:
-        outputs = st.text_area("Outputs")
-    with col4:
-        outcomes = st.text_area("Outcomes")
-    with col5:
-        impact = st.text_area("Impact")
+    tool = st.selectbox("Select a tool", ["Logic Model Builder", "Data Visualization", "Stakeholder Mapping"])
+
+    if tool == "Logic Model Builder":
+        st.subheader("Logic Model Builder")
+        col1, col2, col3, col4, col5 = st.columns(5)
+        with col1:
+            inputs = st.text_area("Inputs")
+        with col2:
+            activities = st.text_area("Activities")
+        with col3:
+            outputs = st.text_area("Outputs")
+        with col4:
+            outcomes = st.text_area("Outcomes")
+        with col5:
+            impact = st.text_area("Impact")
+        
+        if st.button("Generate Logic Model"):
+            generate_logic_model(inputs, activities, outputs, outcomes, impact)
     
-    if st.button("Generate Logic Model"):
-        generate_logic_model(inputs, activities, outputs, outcomes, impact)
+    elif tool == "Data Visualization":
+        st.subheader("Data Visualization")
+        chart_type = st.selectbox("Select chart type", ["Bar", "Line"])
+        x_data = st.text_input("Enter x-axis data (comma-separated)")
+        y_data = st.text_input("Enter y-axis data (comma-separated)")
+        if st.button("Generate Chart"):
+            generate_chart(chart_type, x_data, y_data)
     
-    # Data Visualization
-    st.subheader("Data Visualization")
-    chart_type = st.selectbox("Select chart type", ["Bar", "Line"])
-    x_data = st.text_input("Enter x-axis data (comma-separated)")
-    y_data = st.text_input("Enter y-axis data (comma-separated)")
-    if st.button("Generate Chart"):
-        generate_chart(chart_type, x_data, y_data)
-    
-    # Stakeholder Mapping
-    st.subheader("Stakeholder Mapping")
-    stakeholder_name = st.text_input("Enter stakeholder name")
-    influence = st.slider("Influence", 1, 10, 5)
-    interest = st.slider("Interest", 1, 10, 5)
-    if st.button("Add Stakeholder"):
-        add_stakeholder(stakeholder_name, influence, interest)
-    
-    if "stakeholders" in st.session_state:
-        generate_stakeholder_map()
+    elif tool == "Stakeholder Mapping":
+        st.subheader("Stakeholder Mapping")
+        stakeholder_name = st.text_input("Enter stakeholder name")
+        influence = st.slider("Influence", 1, 10, 5)
+        interest = st.slider("Interest", 1, 10, 5)
+        if st.button("Add Stakeholder"):
+            add_stakeholder(stakeholder_name, influence, interest)
+        
+        if "stakeholders" in st.session_state:
+            generate_stakeholder_map()
