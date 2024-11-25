@@ -1,9 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
-from PIL import Image
-import plotly.graph_objs as go
-import networkx as nx
 import json
 
 # Streamlit configuration
@@ -49,7 +46,7 @@ def evaluation_tools_page():
     
     # Data Visualization
     st.subheader("Data Visualization")
-    chart_type = st.selectbox("Select chart type", ["Bar", "Line", "Scatter"])
+    chart_type = st.selectbox("Select chart type", ["Bar", "Line"])
     x_data = st.text_input("Enter x-axis data (comma-separated)")
     y_data = st.text_input("Enter y-axis data (comma-separated)")
     if st.button("Generate Chart"):
@@ -113,16 +110,7 @@ with st.sidebar:
 
     # Customizable Themes
     theme = st.radio("Theme", ["Light", "Dark"])
-    if theme == "Light":
-        st.markdown("""
-            <style>
-            .stApp {
-                background-color: white;
-                color: black;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-    else:
+    if theme == "Dark":
         st.markdown("""
             <style>
             .stApp {
@@ -258,95 +246,29 @@ def recommend_resources(context):
     ]
 
 def generate_logic_model(inputs, activities, outputs, outcomes, impact):
-    fig = go.Figure(data=[go.Sankey(
-        node = dict(
-          pad = 15,
-          thickness = 20,
-          line = dict(color = "black", width = 0.5),
-          label = ["Inputs", "Activities", "Outputs", "Outcomes", "Impact"],
-          color = "blue"
-        ),
-        link = dict(
-          source = [0, 1, 2, 3],
-          target = [1, 2, 3, 4],
-          value = [1, 1, 1, 1]
-      ))])
-
-    fig.update_layout(title_text="Logic Model", font_size=10)
-    st.plotly_chart(fig)
+    st.write("Logic Model:")
+    st.write(f"Inputs: {inputs}")
+    st.write(f"Activities: {activities}")
+    st.write(f"Outputs: {outputs}")
+    st.write(f"Outcomes: {outcomes}")
+    st.write(f"Impact: {impact}")
 
 def generate_chart(chart_type, x_data, y_data):
     x = [float(i) for i in x_data.split(',')]
     y = [float(i) for i in y_data.split(',')]
     
     if chart_type == "Bar":
-        fig = go.Figure(data=[go.Bar(x=x, y=y)])
-    elif chart_type == "Line":
-        fig = go.Figure(data=[go.Scatter(x=x, y=y, mode='lines')])
+        st.bar_chart({"data": y}, use_container_width=True)
     else:
-        fig = go.Figure(data=[go.Scatter(x=x, y=y, mode='markers')])
-    
-    st.plotly_chart(fig)
+        st.line_chart({"data": y}, use_container_width=True)
 
 def add_stakeholder(name, influence, interest):
     st.session_state.stakeholders.append({"name": name, "influence": influence, "interest": interest})
 
 def generate_stakeholder_map():
-    G = nx.Graph()
+    st.write("Stakeholder Map:")
     for s in st.session_state.stakeholders:
-        G.add_node(s["name"], influence=s["influence"], interest=s["interest"])
-    
-    pos = nx.spring_layout(G)
-    
-    edge_x = []
-    edge_y = []
-    for edge in G.edges():
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
-        edge_x.extend([x0, x1, None])
-        edge_y.extend([y0, y1, None])
-
-    edge_trace = go.Scatter(
-        x=edge_x, y=edge_y,
-        line=dict(width=0.5, color='#888'),
-        hoverinfo='none',
-        mode='lines')
-
-    node_x = []
-    node_y = []
-    for node in G.nodes():
-        x, y = pos[node]
-        node_x.append(x)
-        node_y.append(y)
-
-    node_trace = go.Scatter(
-        x=node_x, y=node_y,
-        mode='markers',
-        hoverinfo='text',
-        marker=dict(
-            showscale=True,
-            colorscale='YlGnBu',
-            size=10,
-            colorbar=dict(
-                thickness=15,
-                title='Node Connections',
-                xanchor='left',
-                titleside='right'
-            )
-        )
-    )
-
-    fig = go.Figure(data=[edge_trace, node_trace],
-                    layout=go.Layout(
-                        title='Stakeholder Map',
-                        showlegend=False,
-                        hovermode='closest',
-                        margin=dict(b=20,l=5,r=5,t=40),
-                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
-                    )
-    
-    st.plotly_chart(fig)
+        st.write(f"{s['name']}: Influence - {s['influence']}, Interest - {s['interest']}")
 
 # Contextual Help
 with st.expander("Evaluation Terminology"):
