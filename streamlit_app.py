@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
 import json
+from PIL import Image
 
 # Streamlit configuration
 st.set_page_config(page_title="Welcome to Evalbuddy!", layout="wide", initial_sidebar_state="expanded")
@@ -27,8 +28,16 @@ if "progress" not in st.session_state:
 if "stakeholders" not in st.session_state:
     st.session_state.stakeholders = []
 
+# Function to display logo
+def display_logo():
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        logo = Image.open('logo.webp')
+        st.image(logo, use_column_width=True)
+
 # Multi-page Application
 def home_page():
+    display_logo()
     st.title("Welcome to Evalbuddy!")
     st.write("EvalBuddy is an advanced AI assistant specializing in guiding users through all forms of evaluation, including formative, summative, developmental, and impact evaluations. While EvalBuddy supports a broad range of evaluation processes, it maintains a foundational emphasis on cultural considerations, recognizing that culture influences every aspect of societies, programs, and their outcomes. EvalBuddy's primary role is to help users design effective, inclusive, and contextually appropriate evaluation plans tailored to their specific goals, contexts, and populations")
     st.caption("Evalbuddy can make mistakes. Please double-check all responses.")
@@ -93,6 +102,7 @@ def home_page():
         st.rerun()
 
 def resources_page():
+    display_logo()
     st.title("Evaluation Resources")
     st.write("Here you can find various resources related to evaluation.")
     
@@ -105,6 +115,7 @@ def resources_page():
             st.write(f"- {rec}")
 
 def evaluation_tools_page():
+    display_logo()
     st.title("Evaluation Tools")
     
     # Interactive Evaluation Framework
@@ -142,6 +153,9 @@ def evaluation_tools_page():
     
     if "stakeholders" in st.session_state:
         generate_stakeholder_map()
+
+# Display logo at the top of the main content area
+display_logo()
 
 # Sidebar for navigation
 with st.sidebar:
@@ -229,7 +243,7 @@ def generate_chart(chart_type, x_data, y_data):
     if chart_type == "Bar":
         st.bar_chart({"data": y}, use_container_width=True)
     else:
-        st.line_chart({"data": y}, use_container_width=True)
+        st.line_chart({"data": y}, use_column_width=True)
 
 def add_stakeholder(name, influence, interest):
     st.session_state.stakeholders.append({"name": name, "influence": influence, "interest": interest})
@@ -265,4 +279,4 @@ if st.button("Save Session"):
         mime="application/json"
     )
 
-uploaded_session = st.file_uploader("Upload Previous Session", type=["pdf"])
+uploaded_session = st.file_uploader("Upload Previous Session", type=["json"])
