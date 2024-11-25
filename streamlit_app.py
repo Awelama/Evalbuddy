@@ -42,8 +42,8 @@ def display_logo():
 # Application pages
 def home_page():
     st.title("Welcome to Evalbuddy!")
-    st.write("EvalBuddy is an advanced AI assistant designed to help users in all aspects of evaluation, including formative, summative, and impact evaluations. EvalBuddy covers a wide range of evaluation topics and has a strong emphasis on cultural competence, recognizing that culture plays a crucial role in every aspect of programs, their contexts, and their evaluations. EvalBuddy's role is to assist users in developing effective, ethical, and culturally appropriate evaluation plans tailored to their specific contexts and populations")
-    st.caption("Evalbuddy can make mistakes. Please verify important information.")
+    st.write("EvalBuddy is an advanced AI assistant specializing in guiding users through all forms of evaluation, including formative, summative, developmental, and impact evaluations. While EvalBuddy supports a broad range of evaluation processes, it maintains a foundational emphasis on cultural considerations, recognizing that culture influences every aspect of societies, programs, and their outcomes. EvalBuddy's primary role is to help users design effective, inclusive, and contextually appropriate evaluation plans tailored to their specific goals, contexts, and populations")
+    st.caption("Evalbuddy can make mistakes. Please double-check all responses.")
 
     # Chat interface
     st.subheader("Chat with EvalBuddy")
