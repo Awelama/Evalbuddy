@@ -151,7 +151,7 @@ with st.sidebar:
         "Resources": resources_page,
         "Evaluation Tools": evaluation_tools_page
     }
-    selected_page = st.selectbox("Go to", list(pages.keys()))
+    selected_page = st.selectbox("Select from here:", list(pages.keys()))
 
     # Progress Tracking
     st.title("Evaluation Progress")
@@ -241,6 +241,7 @@ def generate_stakeholder_map():
 
 # Contextual Help
 with st.expander("Evaluation Terminology"):
+    st.caption("Click below to see.")
     st.write("""
     - Formative Evaluation: Assessment conducted during program development.
     - Summative Evaluation: Assessment of program outcomes and impact.
