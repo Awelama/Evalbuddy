@@ -1,13 +1,10 @@
 import streamlit as st
 import google.generativeai as genai
 from pages import home_page, resources_page, evaluation_tools_page
-from helpers import load_text_file, process_pdf
+from helpers import load_text_file, process_pdf, initialize_chat_session
 
 # Streamlit configuration
 st.set_page_config(page_title="Welcome to Evalbuddy!", layout="wide", initial_sidebar_state="expanded")
-
-# Initialize Gemini client
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
 # Initialize session state
 if "messages" not in st.session_state:
@@ -27,9 +24,12 @@ if "progress" not in st.session_state:
 if "stakeholders" not in st.session_state:
     st.session_state.stakeholders = []
 
-# Load system prompt
-system_prompt = load_text_file('instructions.txt')
-st.session_state.system_prompt = system_prompt  # Add this line
+# Load system prompt (use caching)
+@st.cache_data
+def get_system_prompt():
+    return load_text_file('instructions.txt')
+
+st.session_state.system_prompt = get_system_prompt()
 
 # Sidebar
 with st.sidebar:
@@ -70,6 +70,11 @@ with st.sidebar:
         st.session_state.pdf_content = ""
         st.session_state.chat_session = None
         st.rerun()
+
+# Initialize Gemini client only when needed
+if "gemini_client" not in st.session_state:
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    st.session_state.gemini_client = genai
 
 # Run the selected page
 pages[selected_page]()
