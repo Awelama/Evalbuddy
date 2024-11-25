@@ -13,7 +13,7 @@ genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "model_name" not in st.session_state:
-    st.session_state.model_name = "gemini-1.5-pro-002"
+    st.session_state.model_name = "gemini-pro"
 if "temperature" not in st.session_state:
     st.session_state.temperature = 0.5
 if "debug" not in st.session_state:
@@ -27,43 +27,33 @@ if "progress" not in st.session_state:
 if "stakeholders" not in st.session_state:
     st.session_state.stakeholders = []
 
-# Multi-page Application
+def summarize_pdf(text, max_length=1000):
+    # Simple summarization by truncation. In a real app, use a more sophisticated method.
+    return text[:max_length] + "..." if len(text) > max_length else text
+
 def home_page():
     st.title("Welcome to Evalbuddy!")
-    st.write("EvalBuddy is an advanced AI assistant specializing in guiding users through all forms of evaluation, including formative, summative, developmental, and impact evaluations. While EvalBuddy supports a broad range of evaluation processes, it maintains a foundational emphasis on cultural considerations, recognizing that culture influences every aspect of societies, programs, and their outcomes. EvalBuddy's primary role is to help users design effective, inclusive, and contextually appropriate evaluation plans tailored to their specific goals, contexts, and populations")
+    st.write("EvalBuddy is an advanced AI assistant specializing in guiding users through all forms of evaluation, including formative, summative, developmental, and impact evaluations.")
     st.caption("Evalbuddy can make mistakes. Please double-check all responses.")
 
     # Chat interface
     st.subheader("Chat with EvalBuddy")
-    # Display chat messages
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # User input
     user_input = st.chat_input("Your message:")
 
     if user_input:
-        current_message = {"role": "user", "content": user_input}
-        st.session_state.messages.append(current_message)
-
+        st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
-            st.markdown(current_message["content"])
+            st.markdown(user_input)
 
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
-
+            
             if st.session_state.chat_session is None:
-                generation_config = {
-                    "temperature": st.session_state.temperature,
-                    "top_p": 0.95,
-                    "top_k": 40,
-                    "max_output_tokens": 8192,
-                }
-                model = genai.GenerativeModel(
-                    model_name=st.session_state.model_name,
-                    generation_config=generation_config,
-                )
+                model = genai.GenerativeModel(st.session_state.model_name)
                 
                 initial_messages = [
                     {"role": "user", "parts": [f"System: {system_prompt}"]},
@@ -71,27 +61,24 @@ def home_page():
                 ]
                 
                 if st.session_state.pdf_content:
-                    initial_messages.extend([
-                        {"role": "user", "parts": [f"The following is the content of an uploaded PDF document. Please consider this information when responding to user queries:\n\n{st.session_state.pdf_content}"]},
-                        {"role": "model", "parts": ["I have received and will consider the PDF content in our conversation."]}
-                    ])
+                    pdf_summary = summarize_pdf(st.session_state.pdf_content)
+                    initial_messages.append({"role": "user", "parts": [f"PDF Summary: {pdf_summary}"]})
                 
                 st.session_state.chat_session = model.start_chat(history=initial_messages)
 
             try:
-                # Only include PDF content if it's available
-                if st.session_state.pdf_content:
-                    response = st.session_state.chat_session.send_message(f"Considering the previously uploaded PDF content, please respond to this user query: {current_message['content']}")
-                else:
-                    response = st.session_state.chat_session.send_message(current_message['content'])
-
-                full_response = response.text
+                # Stream the response
+                response_stream = st.session_state.chat_session.send_message(user_input, stream=True)
+                full_response = ""
+                for chunk in response_stream:
+                    full_response += chunk.text
+                    message_placeholder.markdown(full_response + "▌")
                 message_placeholder.markdown(full_response)
+                
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
-                st.session_state.debug.append("Assistant response generated")
 
             except Exception as e:
-                st.error(f"An error occurred while generating the response: {e}")
+                st.error(f"An error occurred: {e}")
                 st.session_state.debug.append(f"Error: {e}")
 
         st.rerun()
@@ -144,7 +131,7 @@ def evaluation_tools_page():
     if st.button("Add Stakeholder"):
         add_stakeholder(stakeholder, influence, interest)
     
-    if "stakeholders" in st.session_state:
+    if st.session_state.stakeholders:
         generate_stakeholder_map()
 
 # Sidebar for navigation
@@ -269,4 +256,13 @@ if st.button("Save Session"):
         mime="application/json"
     )
 
-uploaded_session = st.file_uploader("Upload Previous Session", type=["pdf"])
+uploaded_session = st.file_uploader("Upload Previous Session", type=["json"])
+if uploaded_session:
+    try:
+        session_data = json.load(uploaded_session)
+        st.session_state.messages = session_data.get("messages", [])
+        st.session_state.progress = session_data.get("progress", 0)
+        st.session_state.stakeholders = session_data.get("stakeholders", [])
+        st.success("Previous session loaded successfully!")
+    except Exception as e:
+        st.error(f"Error loading previous session: {e}")
