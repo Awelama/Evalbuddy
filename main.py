@@ -13,7 +13,7 @@ genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "model_name" not in st.session_state:
-    st.session_state.model_name = "gemini-1.5-pro-002"
+    st.session_state.model_name = "gemini-pro"  # Using a smaller model
 if "temperature" not in st.session_state:
     st.session_state.temperature = 0.5
 if "debug" not in st.session_state:
@@ -29,7 +29,7 @@ if "stakeholders" not in st.session_state:
 
 # Load system prompt
 system_prompt = load_text_file('instructions.txt')
-st.session_state.system_prompt = system_prompt  # Add this line
+st.session_state.system_prompt = system_prompt
 
 # Sidebar
 with st.sidebar:
