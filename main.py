@@ -27,6 +27,10 @@ if "progress" not in st.session_state:
 if "stakeholders" not in st.session_state:
     st.session_state.stakeholders = []
 
+# Load system prompt
+system_prompt = load_text_file('instructions.txt')
+st.session_state.system_prompt = system_prompt  # Add this line
+
 # Sidebar
 with st.sidebar:
     st.title("Navigation")
@@ -66,9 +70,6 @@ with st.sidebar:
         st.session_state.pdf_content = ""
         st.session_state.chat_session = None
         st.rerun()
-
-# Load system prompt
-system_prompt = load_text_file('instructions.txt')
 
 # Run the selected page
 pages[selected_page]()
