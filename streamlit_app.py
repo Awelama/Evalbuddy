@@ -240,8 +240,7 @@ def generate_stakeholder_map():
         st.write(f"{s['name']}: Influence - {s['influence']}, Interest - {s['interest']}")
 
 # Contextual Help
-with st.expander("Evaluation Terminology"):
-    st.caption("Click below to see.")
+with st.expander("Evaluation Terminology: Click here."):
     st.write("""
     - Formative Evaluation: Assessment conducted during program development.
     - Summative Evaluation: Assessment of program outcomes and impact.
