@@ -1,84 +1,70 @@
 import streamlit as st
 import google.generativeai as genai
-import json
 from datetime import datetime
 import pandas as pd
+import io
 from io import BytesIO
+import json
 
 # Page configuration
-st.set_page_config(page_title="EvalBuddy", page_icon="📊", layout="wide")
+st.set_page_config(page_title="EvalBuddy", layout="wide", initial_sidebar_state="expanded")
 
-# Custom CSS for styling
+# CSS styling
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-    
-    .stApp {
-        background-color: #ffffff;
-    }
-    
-    .stButton>button {
-        background-color: #007bff;
-        color: white;
-    }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+  
+  html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+  }
+  
+  .stApp {
+    background-color: #f8f9fa;
+  }
+  
+  .big-font {
+    font-size: 24px !important;
+    font-weight: 600;
+    text-align: center;
+  }
 
-    .big-font {
-        font-size:30px !important;
-        font-weight: bold;
-        text-align: center;
-    }
+  .user-bubble, .bot-bubble {
+    padding: 10px 15px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+    max-width: 80%;
+    clear: both;
+  }
 
-    .user-bubble {
-        background-color: #007bff;
-        color: white;
-        padding: 10px 15px;
-        border-radius: 20px;
-        margin: 5px 0;
-        max-width: 70%;
-        float: right;
-        clear: both;
-    }
+  .user-bubble {
+    background-color: #007bff;
+    color: white;
+    float: right;
+  }
 
-    .bot-bubble {
-        background-color: #f1f3f5;
-        color: black;
-        padding: 10px 15px;
-        border-radius: 20px;
-        margin: 5px 0;
-        max-width: 70%;
-        float: left;
-        clear: both;
-    }
+  .bot-bubble {
+    background-color: #f1f3f5;
+    color: black;
+    float: left;
+  }
 
+  .floating-input {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+  }
+
+  /* Responsive design */
+  @media (max-width: 768px) {
     .floating-input {
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 60%;
-        padding: 10px;
-        border-radius: 20px;
-        border: 1px solid #ccc;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      width: 90%;
     }
-
-    [data-testid="stSidebar"][aria-expanded="true"] > div:first-child {
-        width: 300px;
-    }
-    [data-testid="stSidebar"][aria-expanded="false"] > div:first-child {
-        width: 300px;
-        margin-left: -300px;
-    }
-
-    @media (max-width: 768px) {
-        .floating-input {
-            width: 90%;
-        }
-    }
+  }
 </style>
 """, unsafe_allow_html=True)
 
@@ -91,41 +77,42 @@ if "session_start_time" not in st.session_state:
     st.session_state.session_start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 if "experience_level" not in st.session_state:
     st.session_state.experience_level = None
-if "evaluation_stage" not in st.session_state:
-    st.session_state.evaluation_stage = None
+if "evaluation_type" not in st.session_state:
+    st.session_state.evaluation_type = None
 if "cultural_context" not in st.session_state:
     st.session_state.cultural_context = None
 
-# Sidebar for navigation
-with st.sidebar:
-    st.title("EvalBuddy")
-    st.markdown('<i class="fas fa-plus"></i> New Chat', unsafe_allow_html=True)
-    st.button("Home & Chat")
-    st.button("Resources & Export")
-    st.write(f"Session started: {st.session_state.session_start_time}")
-
-# Initialize GenerativeAI client
-genai.configure(api_key=st.secrets.get("GOOGLE_API_KEY", ""))
+# Initialize GenerativeAI
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
 # EvalBuddy prompt
 evalbuddy_prompt = """
-You are EvalBuddy, an advanced AI assistant specializing in culturally responsive evaluation for educators, researchers, program managers, and anyone involved in evaluation processes. Your primary role is to guide users through creating comprehensive, culturally sensitive, and effective evaluation plans.
+You are EvalBuddy, an advanced AI assistant specializing in guiding users through all types of evaluations, including formative, summative, developmental, and impact evaluations. Your primary role is to help design inclusive, contextually appropriate evaluation plans tailored to users' specific goals, contexts, and populations.
 
-Your knowledge encompasses:
-1. Principles of culturally responsive evaluation
-2. Evaluation methodologies and frameworks
-3. Stakeholder engagement strategies
+Focus areas:
+1. Cultural Responsiveness in Evaluation
+2. Evaluation Types (formative, summative, developmental, impact)
+3. Stakeholder engagement
 4. Data collection and analysis methods
 5. Ethical considerations in evaluation
-6. Cultural competence and sensitivity
-7. Reporting and dissemination of findings
+6. Reporting and dissemination
+7. Evaluation capacity building
 
-Adapt your responses based on the user's experience level, evaluation stage, and cultural context. Provide practical, actionable advice and always encourage ethical, inclusive, and culturally sensitive practices.
+Interaction Guidelines:
+- Begin with a welcoming tone
+- Assess user's experience and adapt responses
+- Ask one question at a time to gather necessary information
+- Emphasize how culture influences all aspects of evaluation
+- Provide practical templates and strategies
+- Encourage reflective thinking and feedback
+- Adapt recommendations based on user input
+- Conclude with key takeaways, action items, and solicit feedback
+- Highlight opportunities for learning and improvement
 
-Always empower users to reflect accurately on their evaluation projects and offer support that respects cultural contexts and ethical considerations.
+Always maintain ethical, culturally sensitive, and empowering communication.
 """
 
-# Function to initialize chat sessions
+# Function to initialize chat session
 def initialize_chat_session():
     try:
         model = genai.GenerativeModel(
@@ -137,24 +124,25 @@ def initialize_chat_session():
         )
         
         initial_messages = [
-            {"role": "model", "parts": [{"text": evalbuddy_prompt}]},
-            {"role": "model", "parts": [{"text": "Welcome to EvalBuddy! I'm here to assist you with culturally responsive evaluation. To get started, could you tell me about your experience level with culturally responsive evaluation? Are you a beginner, intermediate, or advanced practitioner?"}]}
+            {"role": "user", "parts": [{"text": evalbuddy_prompt}]},
+            {"role": "model", "parts": [{"text": "Understood. I'm ready to assist with culturally responsive evaluation. How may I help you today?"}]}
         ]
 
         st.session_state.chat_session = model.start_chat(history=initial_messages)
         
     except Exception as e:
-        st.error(f"Error during chat initialization: {e}")
+        st.error(f"An error occurred during chat initialization: {str(e)}")
+
+# Sidebar navigation
+page = st.sidebar.radio("Navigation", ["Home & Chat", "Resources", "Evaluation Tools"])
 
 # Main content area
-col1, col2 = st.columns([2, 1])
-
-with col1:
+if page == "Home & Chat":
+    st.title("EvalBuddy: Your AI Evaluation Assistant")
     st.markdown('<p class="big-font">Welcome to EvalBuddy!</p>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; font-style: italic;">Created by Prince Awelama Kwarase and Dr. Ayesha Boyce</p>', unsafe_allow_html=True)
-    st.write("AI-driven assistant to guide you through culturally responsive evaluation.")
+    st.write("Let's design inclusive, contextually appropriate evaluations together.")
     
-    # Initialize the session if not already started
+    # Initialize chat session if not already done
     if st.session_state.chat_session is None:
         initialize_chat_session()
 
@@ -166,8 +154,7 @@ with col1:
             st.markdown(f'<div class="bot-bubble">{msg["parts"][0]["text"]}</div>', unsafe_allow_html=True)
 
     # Chat input area
-    user_input = st.text_input("", key="user_input", placeholder="Type your message here...", 
-                               help="Press Enter to send", label_visibility="collapsed")
+    user_input = st.text_input("", placeholder="Type your message here. Press Enter to send.", key="chat_input")
     st.markdown('<div class="floating-input"></div>', unsafe_allow_html=True)
 
     if user_input:
@@ -184,81 +171,86 @@ with col1:
                     
                     st.session_state.messages.append({"role": "model", "parts": [{"text": evalbuddy_response}]})
             else:
-                st.error("Chat session was not initialized correctly.")
-        
+                st.error("Chat session was not properly initialized. Please try refreshing the page.")
         except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
-            st.info("Please try again. If the problem persists, try clearing your chat history or reloading the page.")
+            st.error(f"An error occurred: {str(e)}. Please try again. If the problem persists, try clearing your chat history or reloading the page.")
 
-    # Clear chat history button
-    if st.button("Clear Chat History"):
-        st.session_state.messages = []
-        st.session_state.experience_level = None
-        st.session_state.evaluation_stage = None
-        st.session_state.cultural_context = None
-
-with col2:
-    # Experience level selection
-    if st.session_state.experience_level is None:
-        experience_options = ["Beginner", "Intermediate", "Advanced"]
-        st.session_state.experience_level = st.selectbox("What is your experience level with culturally responsive evaluation?", experience_options)
-        if st.session_state.experience_level:
-            st.session_state.messages.append({"role": "user", "parts": [{"text": f"My experience level is {st.session_state.experience_level}"}]})
-
-    # Evaluation stage selection
-    if st.session_state.evaluation_stage is None:
-        stage_options = ["Planning", "Implementation", "Analysis", "Reporting"]
-        st.session_state.evaluation_stage = st.selectbox("At what stage of the evaluation process are you?", stage_options)
-        if st.session_state.evaluation_stage:
-            st.session_state.messages.append({"role": "user", "parts": [{"text": f"I am at the {st.session_state.evaluation_stage} stage of the evaluation process"}]})
-
-    # Cultural context input
-    if st.session_state.cultural_context is None:
-        st.session_state.cultural_context = st.text_area("Please briefly describe the cultural context of your evaluation project:")
-        if st.session_state.cultural_context:
-            st.session_state.messages.append({"role": "user", "parts": [{"text": f"The cultural context of my evaluation project is: {st.session_state.cultural_context}"}]})
-
-    # Resources Section
-    st.subheader("Helpful Resources")
+elif page == "Resources":
+    st.title("Evaluation Resources")
     st.write("Here are some valuable resources for culturally responsive evaluation:")
+    
     resources = [
-        "American Evaluation Association's Statement on Cultural Competence in Evaluation",
+        "American Evaluation Association's Guiding Principles for Evaluators",
         "Culturally Responsive Evaluation: Theory, Practice, and Implications by Stafford Hood et al.",
-        "The Step-by-Step Guide to Evaluation by Holly Lewandowski and Kathryn E. Newcomer",
-        "Culturally Responsive Evaluation and Assessment: Theories, Models, and Tools by Rodney K. Hopson et al."
+        "Developmental Evaluation: Applying Complexity Concepts to Enhance Innovation and Use by Michael Quinn Patton",
+        "The Guide to the Systems Evaluation Protocol by Beverly Parsons and E. Jane Davidson",
+        "Evaluation Capacity Building: A Conceptual Framework and Practical Tools by Hallie Preskill and Shanelle Boyle"
     ]
+    
     for resource in resources:
         st.write(f"- {resource}")
+    
+    st.subheader("Resource Recommendation")
+    user_context = st.text_area("Describe your evaluation context for personalized recommendations:")
+    if st.button("Get Recommendations"):
+        st.write("Based on your context, we recommend:")
+        # Implement resource recommendation logic here
 
-    # Export Functionality
-    st.subheader("Export Chat History")
-
-    if st.session_state.messages:
-        # Export as JSON
-        if st.button("Export as JSON"):
-            chat_history = json.dumps(st.session_state.messages, indent=2)
-            st.download_button(
-                label="Download Chat History (JSON)",
-                data=chat_history,
-                file_name="evalbuddy_chat_history.json",
-                mime="application/json"
-            )
+elif page == "Evaluation Tools":
+    st.title("Evaluation Tools")
+    tool = st.selectbox("Select a tool", ["Stakeholder Mapping", "Logic Model Builder", "Evaluation Plan Generator"])
+    
+    if tool == "Stakeholder Mapping":
+        st.subheader("Stakeholder Mapping Tool")
+        st.write("Use this tool to identify and categorize your evaluation stakeholders.")
+        # Implement stakeholder mapping functionality
         
-        # Export as Excel
-        if st.button("Export as Excel"):
-            df = pd.DataFrame([(msg["role"], msg["parts"][0]["text"]) for msg in st.session_state.messages], 
-                              columns=["Role", "Message"])
-            buffer = BytesIO()
-            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                df.to_excel(writer, sheet_name='Chat History', index=False)
-            st.download_button(
-                label="Download Chat History (Excel)",
-                data=buffer,
-                file_name="evalbuddy_chat_history.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+    elif tool == "Logic Model Builder":
+        st.subheader("Logic Model Builder")
+        st.write("Create an interactive logic model for your program or intervention.")
+        # Implement interactive logic model builder
+        
+    elif tool == "Evaluation Plan Generator":
+        st.subheader("Evaluation Plan Generator")
+        st.write("Generate a basic evaluation plan based on your inputs and chat history.")
+        if st.button("Generate Evaluation Plan"):
+            # Implement evaluation plan generator based on chat history
+            st.write("Your evaluation plan outline:")
+            # Display generated plan
+
+# Common elements across all pages
+st.sidebar.write(f"Session started: {st.session_state.session_start_time}")
+
+# Export functionality
+st.sidebar.subheader("Export Chat History")
+
+if st.sidebar.button("Export as JSON"):
+    if st.session_state.messages:
+        chat_history = json.dumps(st.session_state.messages, indent=2)
+        st.sidebar.download_button(
+            label="Download Chat History (JSON)",
+            data=chat_history,
+            file_name="evalbuddy_chat_history.json",
+            mime="application/json"
+        )
     else:
-        st.write("No chat history available to export.")
+        st.sidebar.write("No chat history to export.")
+
+if st.sidebar.button("Export as Excel"):
+    if st.session_state.messages:
+        df = pd.DataFrame([(msg["role"], msg["parts"][0]["text"]) for msg in st.session_state.messages],
+                          columns=["Role", "Message"])
+        buffer = BytesIO()
+        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+            df.to_excel(writer, sheet_name='Chat History', index=False)
+        st.sidebar.download_button(
+            label="Download Chat History (Excel)",
+            data=buffer,
+            file_name="evalbuddy_chat_history.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        st.sidebar.write("No chat history to export.")
 
 # Run the app
 if __name__ == "__main__":
