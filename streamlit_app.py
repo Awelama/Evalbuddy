@@ -279,4 +279,4 @@ if st.button("Save Session"):
         mime="application/json"
     )
 
-uploaded_session = st.file_uploader("Upload Previous Session", type=["json"])
+uploaded_session = st.file_uploader("Upload Previous Session", type=["pdf"])
