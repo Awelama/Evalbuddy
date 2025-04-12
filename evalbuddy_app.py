@@ -9,9 +9,9 @@ import matplotlib.pyplot as plt
 import time
 import os
 
-# ========== Gemini API Key Setup ==========
+# ========== API Configuration ==========
 genai.configure(
-    api_key=os.getenv("GOOGLE_API_KEY") or "YOUR_API_KEY_HERE"  # Replace with your key
+    api_key=os.getenv("GOOGLE_API_KEY") or "YOUR_API_KEY_HERE"  # Replace with your real key
 )
 
 # Must be first Streamlit command
@@ -110,7 +110,7 @@ def export_chart_to_pdf(fig):
     output.seek(0)
     return output
 
-# ========== Gemini Initialization ==========
+# ========== Gemini Init ==========
 @st.cache_resource
 def initialize_chat_session(model_name, temperature):
     generation_config = {
@@ -121,7 +121,7 @@ def initialize_chat_session(model_name, temperature):
     }
     try:
         model = genai.GenerativeModel(
-            model_name="models/gemini-pro",
+            model_name="gemini-pro",  # ✅ Correct model name for v1
             generation_config=generation_config,
         )
         return model.start_chat()
@@ -166,7 +166,6 @@ def home_page():
 
             try:
                 if st.session_state.chat_session:
-                    # First-time setup messages
                     if "chat_initialized" not in st.session_state:
                         st.session_state.chat_session.send_message(f"System: {st.session_state.system_prompt}")
                         if st.session_state.pdf_content:
@@ -205,7 +204,7 @@ def resources_page():
     st.header("Evaluation Resources")
     context = st.text_area("Describe your evaluation context:")
     if st.button("Get Recommendations"):
-        st.info("⚠️ This requires integration with a recommend_resources() function.")
+        st.info("⚠️ This feature requires integration with a recommend_resources() function.")
 
 # ========== Tools Tab ==========
 def evaluation_tools_page():
@@ -298,11 +297,11 @@ def evaluation_tools_page():
                 chart_pdf = export_chart_to_pdf(fig)
                 st.download_button("Download Chart PDF", chart_pdf, "Chart.pdf", mime="application/pdf")
 
-# ========== Main App ==========
+# ========== Main ==========
 def main():
     apply_custom_css()
     st.session_state.setdefault("messages", [])
-    st.session_state.setdefault("model_name", "models/gemini-pro")
+    st.session_state.setdefault("model_name", "gemini-pro")
     st.session_state.setdefault("temperature", 0.7)
     st.session_state.setdefault("system_prompt", "You are EvalBuddy, an AI assistant specialized in program evaluation.")
     st.session_state.setdefault("pdf_content", "")
