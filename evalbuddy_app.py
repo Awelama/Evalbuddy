@@ -93,7 +93,7 @@ def get_openai_response(messages, model="gpt-3.5-turbo"):
 
 # ========== Chat Tab ==========
 def home_page():
-    st.header("Let's chat about evaluation")
+    st.header("Let's chat about evaluation!")
     st.caption("Evalbuddy is your AI thought partner for your evaluation needs.")
     pdf_upload_area()
 
