@@ -1,0 +1,3 @@
+import importlib.metadata
+sdk_version = importlib.metadata.version("google-generativeai")
+st.sidebar.write("🔍 Gemini SDK version:", sdk_version)
