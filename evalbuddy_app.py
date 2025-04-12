@@ -93,8 +93,8 @@ def get_openai_response(messages, model="gpt-3.5-turbo"):
 
 # ========== Chat Tab ==========
 def home_page():
-    st.header("Chat with EvalBuddy")
-    st.caption("EvalBuddy is your assistant for smarter evaluation.")
+    st.header("Let's chat about evaluation")
+    st.caption("Evalbuddy is your AI thought partner for your evaluation needs.")
     pdf_upload_area()
 
     for message in st.session_state.messages:
@@ -234,11 +234,11 @@ def evaluation_tools_page():
 def main():
     apply_custom_css()
     st.session_state.setdefault("messages", [])
-    st.session_state.setdefault("system_prompt", "You are EvalBuddy, an AI assistant specialized in program evaluation.")
+    st.session_state.setdefault("system_prompt", "You are Evalbuddy, an advanced AI assistant for evaluation work.")
     st.session_state.setdefault("pdf_content", "")
 
-    st.title("EvalBuddy")
-    st.caption("Your Evaluation Assistant for Smarter Impact")
+    st.title("Evalbuddy")
+    st.caption("Your thought partner for evaluation")
 
     tabs = st.tabs(["💬 Chat", "📚 Resources", "🛠️ Tools"])
     with tabs[0]: home_page()
