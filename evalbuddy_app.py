@@ -1,6 +1,5 @@
 import streamlit as st
-import google.generativeai as genai
-from google.generativeai.types import GenerateContentResponse
+import openai
 import pdfplumber
 from fpdf import FPDF
 from docx import Document
@@ -10,11 +9,8 @@ import time
 import os
 
 # ========== API Configuration ==========
-genai.configure(
-    api_key=os.getenv("GOOGLE_API_KEY") or "YOUR_API_KEY_HERE"  # Replace with your real key
-)
+openai.api_key = os.getenv("OPENAI_API_KEY") or "YOUR_OPENAI_KEY_HERE"
 
-# Must be first Streamlit command
 st.set_page_config(page_title="EvalBuddy", layout="wide")
 
 # ========== Custom CSS ==========
@@ -31,12 +27,11 @@ def apply_custom_css():
             color: #FFFFFF !important;
             border-radius: 8px !important;
         }
-        .stChatMessage[data-testid="stChatMessage-user"] { background-color: #2D3748 !important; }
-        .stChatMessage[data-testid="stChatMessage-assistant"] { background-color: #333333 !important; }
         .processing-indicator {
-            color: #FF7F50; padding: 10px;
+            color: #FF7F50;
             animation: pulse 1.5s infinite ease-in-out;
             font-weight: bold;
+            padding: 10px;
         }
         @keyframes pulse {
             0% { opacity: 0.6; }
@@ -110,37 +105,24 @@ def export_chart_to_pdf(fig):
     output.seek(0)
     return output
 
-# ========== Gemini Init ==========
-@st.cache_resource
-def initialize_chat_session(model_name, temperature):
-    generation_config = {
-        "temperature": temperature,
-        "top_p": 0.95,
-        "top_k": 40,
-        "max_output_tokens": 8192,
-    }
+# ========== Chat Function ==========
+def get_openai_response(messages, model="gpt-3.5-turbo"):
     try:
-        model = genai.GenerativeModel(
-            model_name="gemini-pro",  # ✅ Correct model name for v1
-            generation_config=generation_config,
+        response = openai.ChatCompletion.create(
+            model=model,
+            messages=messages,
+            stream=True
         )
-        return model.start_chat()
+        return response
     except Exception as e:
-        st.error("❌ Failed to initialize Gemini model.")
+        st.error("❌ OpenAI response failed.")
         st.exception(e)
-        return None
-
-def stream_response(response: GenerateContentResponse):
-    for chunk in response:
-        yield chunk.text
-
-def display_processing_indicator():
-    return st.markdown('<div class="processing-indicator">EvalBuddy is thinking...</div>', unsafe_allow_html=True)
+        return []
 
 # ========== Chat Tab ==========
 def home_page():
     st.header("Chat with EvalBuddy")
-    st.caption("EvalBuddy is an AI assistant for evaluation guidance.")
+    st.caption("EvalBuddy is your assistant for smarter evaluation.")
     pdf_upload_area()
 
     for message in st.session_state.messages:
@@ -149,43 +131,34 @@ def home_page():
 
     user_input = st.chat_input("How can I help with your evaluation work today?")
     if user_input:
-        current_message = {"role": "user", "content": user_input}
-        st.session_state.messages.append(current_message)
+        user_message = {"role": "user", "content": user_input}
+        st.session_state.messages.append(user_message)
 
         with st.chat_message("user"):
-            st.markdown(current_message["content"])
+            st.markdown(user_input)
+
         with st.chat_message("assistant"):
             placeholder = st.empty()
-            indicator = display_processing_indicator()
+            placeholder.markdown("▌")
+            full_response = ""
 
-            if "chat_session" not in st.session_state or st.session_state.chat_session is None:
-                st.session_state.chat_session = initialize_chat_session(
-                    st.session_state.model_name,
-                    st.session_state.temperature
-                )
+            # Build full prompt
+            chat_history = st.session_state.messages.copy()
+            if st.session_state.pdf_content:
+                chat_history.insert(0, {"role": "system", "content": f"Consider the following PDF content:\n{st.session_state.pdf_content}"})
+            chat_history.insert(0, {"role": "system", "content": st.session_state.system_prompt})
 
+            response = get_openai_response(chat_history)
             try:
-                if st.session_state.chat_session:
-                    if "chat_initialized" not in st.session_state:
-                        st.session_state.chat_session.send_message(f"System: {st.session_state.system_prompt}")
-                        if st.session_state.pdf_content:
-                            st.session_state.chat_session.send_message(
-                                f"The following is the content of an uploaded PDF document:\n\n{st.session_state.pdf_content}"
-                            )
-                        st.session_state.chat_initialized = True
-
-                    response = st.session_state.chat_session.send_message(current_message["content"], stream=True)
-                    full_response = ""
-                    for chunk in stream_response(response):
-                        full_response += chunk
-                        placeholder.markdown(full_response + "▌")
-                        time.sleep(0.001)
-                    indicator.empty()
-                    placeholder.markdown(full_response)
-                    st.session_state.messages.append({"role": "assistant", "content": full_response})
+                for chunk in response:
+                    delta = chunk.choices[0].delta.get("content", "")
+                    full_response += delta
+                    placeholder.markdown(full_response + "▌")
+                    time.sleep(0.001)
+                placeholder.markdown(full_response)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
             except Exception as e:
-                indicator.empty()
-                st.error("❌ Gemini response failed.")
+                st.error("OpenAI streaming failed.")
                 st.exception(e)
 
     st.markdown("---")
@@ -204,21 +177,18 @@ def resources_page():
     st.header("Evaluation Resources")
     context = st.text_area("Describe your evaluation context:")
     if st.button("Get Recommendations"):
-        st.info("⚠️ This feature requires integration with a recommend_resources() function.")
+        st.info("⚠️ This feature requires integration with a recommendation engine.")
 
 # ========== Tools Tab ==========
 def evaluation_tools_page():
     st.header("Evaluation Tools")
-
     st.subheader("🗂️ Project Manager")
     project_name = st.text_input("Project Name")
     if "projects" not in st.session_state:
         st.session_state.projects = {}
 
     if st.button("💾 Save Project"):
-        if not project_name:
-            st.warning("Please enter a project name.")
-        else:
+        if project_name:
             st.session_state.projects[project_name] = {
                 "chat": st.session_state.messages.copy(),
                 "logic_model": {
@@ -236,11 +206,11 @@ def evaluation_tools_page():
                 }
             }
             st.success(f"Project '{project_name}' saved!")
+        else:
+            st.warning("Please enter a project name.")
 
     if st.button("📂 Load Project"):
-        if project_name not in st.session_state.projects:
-            st.warning("Project not found.")
-        else:
+        if project_name in st.session_state.projects:
             project = st.session_state.projects[project_name]
             st.session_state.messages = project["chat"]
             lm = project["logic_model"]
@@ -255,6 +225,8 @@ def evaluation_tools_page():
             st.session_state.y_data = ch["y_data"]
             st.session_state.chart_title = ch["title"]
             st.success(f"Project '{project_name}' loaded!")
+        else:
+            st.warning("Project not found.")
 
     st.markdown("---")
     tool = st.selectbox("Choose Tool", ["Logic Model Builder", "Chart Generator"])
@@ -301,21 +273,15 @@ def evaluation_tools_page():
 def main():
     apply_custom_css()
     st.session_state.setdefault("messages", [])
-    st.session_state.setdefault("model_name", "gemini-pro")
-    st.session_state.setdefault("temperature", 0.7)
     st.session_state.setdefault("system_prompt", "You are EvalBuddy, an AI assistant specialized in program evaluation.")
     st.session_state.setdefault("pdf_content", "")
-
     st.title("EvalBuddy")
     st.caption("Your Evaluation Assistant for Smarter Impact")
 
     tabs = st.tabs(["💬 Chat", "📚 Resources", "🛠️ Tools"])
-    with tabs[0]:
-        home_page()
-    with tabs[1]:
-        resources_page()
-    with tabs[2]:
-        evaluation_tools_page()
+    with tabs[0]: home_page()
+    with tabs[1]: resources_page()
+    with tabs[2]: evaluation_tools_page()
 
 if __name__ == "__main__":
     main()
