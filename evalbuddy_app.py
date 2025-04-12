@@ -1,5 +1,5 @@
 import streamlit as st
-import openai
+from openai import OpenAI
 import pdfplumber
 from fpdf import FPDF
 from docx import Document
@@ -8,9 +8,10 @@ import matplotlib.pyplot as plt
 import time
 import os
 
-# ========== API Configuration ==========
-openai.api_key = os.getenv("OPENAI_API_KEY") or "YOUR_OPENAI_KEY_HERE"
+# ========== OpenAI Client ==========
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or "YOUR_OPENAI_API_KEY")
 
+# Streamlit page config
 st.set_page_config(page_title="EvalBuddy", layout="wide")
 
 # ========== Custom CSS ==========
@@ -105,15 +106,15 @@ def export_chart_to_pdf(fig):
     output.seek(0)
     return output
 
-# ========== Chat Function ==========
+# ========== OpenAI Chat ==========
 def get_openai_response(messages, model="gpt-3.5-turbo"):
     try:
-        response = openai.ChatCompletion.create(
+        stream = client.chat.completions.create(
             model=model,
             messages=messages,
-            stream=True
+            stream=True,
         )
-        return response
+        return stream
     except Exception as e:
         st.error("❌ OpenAI response failed.")
         st.exception(e)
@@ -142,7 +143,6 @@ def home_page():
             placeholder.markdown("▌")
             full_response = ""
 
-            # Build full prompt
             chat_history = st.session_state.messages.copy()
             if st.session_state.pdf_content:
                 chat_history.insert(0, {"role": "system", "content": f"Consider the following PDF content:\n{st.session_state.pdf_content}"})
@@ -151,7 +151,7 @@ def home_page():
             response = get_openai_response(chat_history)
             try:
                 for chunk in response:
-                    delta = chunk.choices[0].delta.get("content", "")
+                    delta = chunk.choices[0].delta.content or ""
                     full_response += delta
                     placeholder.markdown(full_response + "▌")
                     time.sleep(0.001)
@@ -177,18 +177,21 @@ def resources_page():
     st.header("Evaluation Resources")
     context = st.text_area("Describe your evaluation context:")
     if st.button("Get Recommendations"):
-        st.info("⚠️ This feature requires integration with a recommendation engine.")
+        st.info("⚠️ Recommendation system not yet connected.")
 
 # ========== Tools Tab ==========
 def evaluation_tools_page():
     st.header("Evaluation Tools")
+
     st.subheader("🗂️ Project Manager")
     project_name = st.text_input("Project Name")
     if "projects" not in st.session_state:
         st.session_state.projects = {}
 
     if st.button("💾 Save Project"):
-        if project_name:
+        if not project_name:
+            st.warning("Please enter a project name.")
+        else:
             st.session_state.projects[project_name] = {
                 "chat": st.session_state.messages.copy(),
                 "logic_model": {
@@ -206,11 +209,11 @@ def evaluation_tools_page():
                 }
             }
             st.success(f"Project '{project_name}' saved!")
-        else:
-            st.warning("Please enter a project name.")
 
     if st.button("📂 Load Project"):
-        if project_name in st.session_state.projects:
+        if project_name not in st.session_state.projects:
+            st.warning("Project not found.")
+        else:
             project = st.session_state.projects[project_name]
             st.session_state.messages = project["chat"]
             lm = project["logic_model"]
@@ -225,8 +228,6 @@ def evaluation_tools_page():
             st.session_state.y_data = ch["y_data"]
             st.session_state.chart_title = ch["title"]
             st.success(f"Project '{project_name}' loaded!")
-        else:
-            st.warning("Project not found.")
 
     st.markdown("---")
     tool = st.selectbox("Choose Tool", ["Logic Model Builder", "Chart Generator"])
@@ -275,6 +276,7 @@ def main():
     st.session_state.setdefault("messages", [])
     st.session_state.setdefault("system_prompt", "You are EvalBuddy, an AI assistant specialized in program evaluation.")
     st.session_state.setdefault("pdf_content", "")
+
     st.title("EvalBuddy")
     st.caption("Your Evaluation Assistant for Smarter Impact")
 
