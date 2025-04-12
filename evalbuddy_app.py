@@ -8,10 +8,10 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import time
 
-# Must be the first Streamlit command
+# Must be first
 st.set_page_config(page_title="EvalBuddy", layout="wide")
 
-# ========== Custom CSS ==========
+# =================== CSS ===================
 def apply_custom_css():
     st.markdown("""
     <style>
@@ -40,7 +40,7 @@ def apply_custom_css():
     </style>
     """, unsafe_allow_html=True)
 
-# ========== PDF Upload ==========
+# =================== PDF UPLOAD ===================
 def pdf_upload_area():
     uploaded_pdf = st.file_uploader("📄 Upload Evaluation PDF", type=["pdf"])
     if uploaded_pdf:
@@ -52,11 +52,10 @@ def pdf_upload_area():
         with st.expander("🔍 Preview Extracted PDF Text"):
             st.text_area("PDF Content", content, height=300, disabled=True)
 
-# ========== Export Helpers ==========
+# =================== EXPORT HELPERS ===================
 def export_chat_to_pdf(messages):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt="EvalBuddy Chat Export", ln=True, align="C")
     pdf.ln()
@@ -105,7 +104,7 @@ def export_chart_to_pdf(fig):
     output.seek(0)
     return output
 
-# ========== Gemini Chat ==========
+# =================== GEMINI SETUP ===================
 @st.cache_resource
 def initialize_chat_session(model_name, temperature):
     generation_config = {
@@ -127,7 +126,7 @@ def stream_response(response: GenerateContentResponse):
 def display_processing_indicator():
     return st.markdown('<div class="processing-indicator">EvalBuddy is thinking...</div>', unsafe_allow_html=True)
 
-# ========== Chat Page ==========
+# =================== CHAT TAB ===================
 def home_page():
     st.header("Chat with EvalBuddy")
     st.caption("EvalBuddy is an AI assistant for evaluation guidance.")
@@ -138,18 +137,15 @@ def home_page():
             st.markdown(message["content"])
 
     user_input = st.chat_input("How can I help with your evaluation work today?")
-
     if user_input:
         current_message = {"role": "user", "content": user_input}
         st.session_state.messages.append(current_message)
 
         with st.chat_message("user"):
             st.markdown(current_message["content"])
-
         with st.chat_message("assistant"):
             placeholder = st.empty()
             indicator = display_processing_indicator()
-
             if "chat_session" not in st.session_state:
                 st.session_state.chat_session = initialize_chat_session(
                     st.session_state.model_name,
@@ -160,7 +156,6 @@ def home_page():
                     st.session_state.chat_session.send_message(
                         f"The following is the content of an uploaded PDF document:\n\n{st.session_state.pdf_content}"
                     )
-
             try:
                 response = st.session_state.chat_session.send_message(current_message["content"], stream=True)
                 full_response = ""
@@ -174,7 +169,6 @@ def home_page():
             except Exception as e:
                 indicator.empty()
                 st.error(f"Error: {e}")
-
         st.rerun()
 
     st.markdown("---")
@@ -188,18 +182,17 @@ def home_page():
             doc = export_chat_to_docx(st.session_state.messages)
             st.download_button("📝 Download Word", doc, "EvalBuddy_Chat.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
-# ========== Resources Page ==========
+# =================== RESOURCES ===================
 def resources_page():
     st.header("Evaluation Resources")
     context = st.text_area("Describe your evaluation context:")
     if st.button("Get Recommendations"):
-        st.info("⚠️ This requires integration with your recommend_resources() function.")
+        st.info("⚠️ Recommendation feature requires connection to recommend_resources().")
 
-# ========== Tools Page ==========
+# =================== TOOLS + PROJECTS ===================
 def evaluation_tools_page():
     st.header("Evaluation Tools")
 
-    # ===== Project Save/Load =====
     st.subheader("🗂️ Project Manager")
     project_name = st.text_input("Project Name")
     if "projects" not in st.session_state:
@@ -247,18 +240,15 @@ def evaluation_tools_page():
             st.success(f"Project '{project_name}' loaded!")
 
     st.markdown("---")
-
     tool = st.selectbox("Choose Tool", ["Logic Model Builder", "Chart Generator"])
 
     if tool == "Logic Model Builder":
         st.subheader("🧩 Logic Model Builder")
-
         inputs = st.text_area("Inputs", value=st.session_state.get("lm_inputs", ""), key="lm_inputs")
         activities = st.text_area("Activities", value=st.session_state.get("lm_activities", ""), key="lm_activities")
         outputs = st.text_area("Outputs", value=st.session_state.get("lm_outputs", ""), key="lm_outputs")
         outcomes = st.text_area("Outcomes", value=st.session_state.get("lm_outcomes", ""), key="lm_outcomes")
         impact = st.text_area("Impact", value=st.session_state.get("lm_impact", ""), key="lm_impact")
-
         logic_model_data = {
             "Inputs": inputs,
             "Activities": activities,
@@ -266,19 +256,16 @@ def evaluation_tools_page():
             "Outcomes": outcomes,
             "Impact": impact
         }
-
         if st.button("📤 Export Logic Model (Word)"):
             doc = export_logic_model_to_docx(logic_model_data)
             st.download_button("Download DOCX", doc, "Logic_Model.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
     elif tool == "Chart Generator":
         st.subheader("📊 Chart Generator")
-
         chart_type = st.selectbox("Chart Type", ["Bar", "Line"], key="chart_type")
         x_data = st.text_input("X-axis values (comma-separated)", st.session_state.get("x_data", ""), key="x_data")
         y_data = st.text_input("Y-axis values (comma-separated)", st.session_state.get("y_data", ""), key="y_data")
         title = st.text_input("Chart Title", st.session_state.get("chart_title", ""), key="chart_title")
-
         if st.button("Generate Chart"):
             x = [i.strip() for i in x_data.split(",")]
             y = [float(i.strip()) for i in y_data.split(",")]
@@ -289,12 +276,11 @@ def evaluation_tools_page():
                 ax.plot(x, y, marker="o")
             ax.set_title(title)
             st.pyplot(fig)
-
             if st.button("📤 Export Chart (PDF)"):
                 chart_pdf = export_chart_to_pdf(fig)
                 st.download_button("Download Chart PDF", chart_pdf, "Chart.pdf", mime="application/pdf")
 
-# ========== Main ==========
+# =================== MAIN ===================
 def main():
     apply_custom_css()
 
@@ -307,4 +293,13 @@ def main():
     st.title("EvalBuddy")
     st.caption("Your Evaluation Assistant for Smarter Impact")
 
-    tabs = st.tabs(["💬 Chat", "📚 Resources", "🛠
+    tabs = st.tabs(["💬 Chat", "📚 Resources", "🛠️ Tools"])
+    with tabs[0]:
+        home_page()
+    with tabs[1]:
+        resources_page()
+    with tabs[2]:
+        evaluation_tools_page()
+
+if __name__ == "__main__":
+    main()
