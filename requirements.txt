@@ -1,4 +1,7 @@
-streamlit
 openai
-Pillow
-PyPDF2
+streamlit
+PyMuPDF
+fpdf
+pandas
+altair
+graphviz
