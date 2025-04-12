@@ -146,6 +146,7 @@ def home_page():
         with st.chat_message("assistant"):
             placeholder = st.empty()
             indicator = display_processing_indicator()
+
             if "chat_session" not in st.session_state:
                 st.session_state.chat_session = initialize_chat_session(
                     st.session_state.model_name,
@@ -156,20 +157,20 @@ def home_page():
                     st.session_state.chat_session.send_message(
                         f"The following is the content of an uploaded PDF document:\n\n{st.session_state.pdf_content}"
                     )
+
             try:
                 response = st.session_state.chat_session.send_message(current_message["content"], stream=True)
                 full_response = ""
                 for chunk in stream_response(response):
                     full_response += chunk
                     placeholder.markdown(full_response + "▌")
-                    time.sleep(0.01)
+                    time.sleep(0.001)  # Reduced for speed
                 indicator.empty()
                 placeholder.markdown(full_response)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
             except Exception as e:
                 indicator.empty()
                 st.error(f"Error: {e}")
-        st.rerun()
 
     st.markdown("---")
     st.subheader("📤 Export Conversation")
@@ -182,14 +183,14 @@ def home_page():
             doc = export_chat_to_docx(st.session_state.messages)
             st.download_button("📝 Download Word", doc, "EvalBuddy_Chat.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
-# =================== RESOURCES ===================
+# =================== RESOURCES TAB ===================
 def resources_page():
     st.header("Evaluation Resources")
     context = st.text_area("Describe your evaluation context:")
     if st.button("Get Recommendations"):
-        st.info("⚠️ Recommendation feature requires connection to recommend_resources().")
+        st.info("⚠️ Recommendation system not yet connected.")
 
-# =================== TOOLS + PROJECTS ===================
+# =================== TOOLS TAB ===================
 def evaluation_tools_page():
     st.header("Evaluation Tools")
 
@@ -283,7 +284,6 @@ def evaluation_tools_page():
 # =================== MAIN ===================
 def main():
     apply_custom_css()
-
     st.session_state.setdefault("messages", [])
     st.session_state.setdefault("model_name", "gemini-pro")
     st.session_state.setdefault("temperature", 0.7)
