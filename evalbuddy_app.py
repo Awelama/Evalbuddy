@@ -11,7 +11,6 @@ import os
 # ========== OpenAI Client ==========
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or "YOUR_OPENAI_API_KEY")
 
-# Streamlit page config
 st.set_page_config(page_title="EvalBuddy", layout="wide")
 
 # ========== Custom CSS ==========
@@ -55,34 +54,6 @@ def pdf_upload_area():
             st.text_area("PDF Content", content, height=300, disabled=True)
 
 # ========== Export Helpers ==========
-def export_chat_to_pdf(messages):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="EvalBuddy Chat Export", ln=True, align="C")
-    pdf.ln()
-    for msg in messages:
-        role = msg["role"].capitalize()
-        content = msg["content"]
-        pdf.multi_cell(0, 10, f"{role}: {content}")
-        pdf.ln()
-    output = BytesIO()
-    pdf.output(output)
-    output.seek(0)
-    return output
-
-def export_chat_to_docx(messages):
-    doc = Document()
-    doc.add_heading("EvalBuddy Chat Export", 0)
-    for msg in messages:
-        role = msg["role"].capitalize()
-        content = msg["content"]
-        doc.add_paragraph(f"{role}: {content}")
-    output = BytesIO()
-    doc.save(output)
-    output.seek(0)
-    return output
-
 def export_logic_model_to_docx(data):
     doc = Document()
     doc.add_heading("Logic Model", 0)
@@ -160,17 +131,6 @@ def home_page():
             except Exception as e:
                 st.error("OpenAI streaming failed.")
                 st.exception(e)
-
-    st.markdown("---")
-    st.subheader("📤 Export Conversation")
-    format_choice = st.selectbox("Choose format", ["PDF", "Word (DOCX)"])
-    if st.button("Download Chat"):
-        if format_choice == "PDF":
-            pdf = export_chat_to_pdf(st.session_state.messages)
-            st.download_button("📄 Download PDF", pdf, "EvalBuddy_Chat.pdf", mime="application/pdf")
-        else:
-            doc = export_chat_to_docx(st.session_state.messages)
-            st.download_button("📝 Download Word", doc, "EvalBuddy_Chat.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
 # ========== Resources Tab ==========
 def resources_page():
