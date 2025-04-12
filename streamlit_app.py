@@ -1,6 +1,6 @@
 import streamlit as st
-import openai
 import time
+from openai import OpenAI
 
 from helpers.logic_model import generate_logic_model
 from helpers.chart import generate_chart
@@ -8,15 +8,24 @@ from helpers.pdf_utils import extract_pdf_text, preview_pdf
 from helpers.export import export_conversation_md, export_conversation_pdf
 from helpers import recommend_resources
 
-# Set up OpenAI key
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+# OpenAI client setup
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 st.set_page_config(page_title="EvalBuddy", layout="wide", initial_sidebar_state="expanded")
 
-with open("styles/theme.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+# Optional custom CSS theme
+try:
+    with open("styles/theme.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+except FileNotFoundError:
+    pass  # Fail silently
 
-st.sidebar.image("static/logo.png", width=100)
+# Optional logo image
+try:
+    st.sidebar.image("https://api.dicebear.com/7.x/bottts/png?seed=EvalBuddy&backgroundColor=ff7f50", width=100)
+except:
+    pass
+
 st.sidebar.title("EvalBuddy v2")
 
 # Session state init
@@ -26,7 +35,7 @@ if "messages" not in st.session_state:
 if "pdf_content" not in st.session_state:
     st.session_state.pdf_content = ""
 
-# Upload area
+# Upload zone
 def pdf_upload_zone():
     uploaded_pdf = st.file_uploader("📄 Upload Evaluation PDF", type=["pdf"])
     if uploaded_pdf:
@@ -37,11 +46,11 @@ def pdf_upload_zone():
 # Welcome tab
 def show_welcome():
     st.header("👋 Welcome to EvalBuddy")
-    st.markdown("Your AI partner for smarter evaluations.")
+    st.markdown("I'm a great AI thought-partner for your evaluation needs.")
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("Design Evaluation"):
-            st.session_state.quick_prompt = "How do I design a good evaluation?"
+            st.session_state.quick_prompt = "How do I design a good evaluation plan?"
     with col2:
         if st.button("Logic Model Help"):
             st.session_state.quick_prompt = "Help me build a logic model"
@@ -50,16 +59,16 @@ def show_welcome():
             st.experimental_set_query_params(tab="Chat")
             st.rerun()
 
-# Chat tab using OpenAI
+# Chat with OpenAI v1.0+
 def show_chat():
-    st.subheader("💬 Chat with EvalBuddy")
+    st.subheader("💬 Let's chat about evaluation")
     pdf_upload_zone()
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    user_input = st.chat_input("Ask EvalBuddy anything...")
+    user_input = st.chat_input("How can I help with your evaluation work?")
 
     if user_input or st.session_state.get("quick_prompt"):
         prompt = user_input or st.session_state.pop("quick_prompt")
@@ -73,20 +82,21 @@ def show_chat():
             full_reply = ""
 
             with st.spinner("Thinking..."):
-                messages = [{"role": "system", "content": "You are EvalBuddy, an expert AI in program evaluation."}]
+                chat_messages = [
+                    {"role": "system", "content": "You are EvalBuddy, an expert AI in program evaluation."}
+                ]
                 if st.session_state.pdf_content:
-                    messages.append({"role": "system", "content": "Context from uploaded PDF:\n" + st.session_state.pdf_content[:3000]})
-
-                messages.extend(st.session_state.messages)
+                    chat_messages.append({"role": "system", "content": f"PDF context:\n{st.session_state.pdf_content[:3000]}"})
+                chat_messages.extend(st.session_state.messages)
 
                 try:
-                    response = openai.ChatCompletion.create(
-                        model="gpt-4",  # or gpt-3.5-turbo
-                        messages=messages,
+                    response = client.chat.completions.create(
+                        model="gpt-4",
+                        messages=chat_messages,
                         stream=True,
                     )
                     for chunk in response:
-                        delta = chunk["choices"][0]["delta"].get("content", "")
+                        delta = chunk.choices[0].delta.content or ""
                         full_reply += delta
                         placeholder.markdown(full_reply + "▌")
                         time.sleep(0.01)
