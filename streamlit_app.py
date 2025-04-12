@@ -1,6 +1,6 @@
 import streamlit as st
 import time
-from openai import OpenAI
+import google.generativeai as genai
 
 from helpers.logic_model import generate_logic_model
 from helpers.chart import generate_chart
@@ -8,57 +8,36 @@ from helpers.pdf_utils import extract_pdf_text, preview_pdf
 from helpers.export import export_conversation_pdf
 from helpers import recommend_resources
 
-# 🔐 OpenAI Client
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# 🔐 Authenticate Gemini API
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+model = genai.GenerativeModel("gemini-pro")
 
 st.set_page_config(page_title="EvalBuddy", layout="wide", initial_sidebar_state="expanded")
 
-# ✅ Optional: Apply custom theme
+# ✅ Optional: Load dark theme
 try:
     with open("styles/theme.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 except FileNotFoundError:
     pass
 
-# ✅ Sidebar Branding
+# ✅ Sidebar branding
 try:
     st.sidebar.image("https://api.dicebear.com/7.x/bottts/png?seed=EvalBuddy&backgroundColor=ff7f50", width=100)
 except:
     pass
-st.sidebar.title("EvalBuddy v2.2")
 
-# ✅ Tabs: Chat + Resources Only
+st.sidebar.title("EvalBuddy v2.3")
 tab = st.sidebar.radio("Navigation", ["💬 Chat", "📚 Resources"])
 
-# ✅ Session Initialization
+# 🧠 Init state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "pdf_content" not in st.session_state:
     st.session_state.pdf_content = ""
 
-# ✅ GPT-4 → GPT-3.5 fallback logic
-def get_model_response(chat_messages):
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=chat_messages,
-            stream=True,
-        )
-        return response, "gpt-4"
-    except Exception as e:
-        if "model_not_found" in str(e) or "does not exist" in str(e):
-            st.warning("⚠️ GPT-4 not available. Falling back to gpt-3.5-turbo.")
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=chat_messages,
-                stream=True,
-            )
-            return response, "gpt-3.5-turbo"
-        else:
-            raise e
-
-# ✅ PDF Upload Component
+# 📥 PDF uploader
 def pdf_upload_zone():
     uploaded_pdf = st.file_uploader("📄 Upload Evaluation PDF", type=["pdf"])
     if uploaded_pdf:
@@ -66,11 +45,12 @@ def pdf_upload_zone():
         preview_pdf(st.session_state.pdf_content)
         st.success("PDF uploaded and parsed.")
 
-# 💬 Chat UI
+# 💬 Chat Interface
 def show_chat():
-    st.subheader("💬 Chat with EvalBuddy")
+    st.subheader("💬 Chat with EvalBuddy (Gemini)")
     pdf_upload_zone()
 
+    # History messages
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
@@ -79,7 +59,6 @@ def show_chat():
 
     if user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
-
         with st.chat_message("user"):
             st.markdown(user_input)
 
@@ -88,34 +67,42 @@ def show_chat():
             full_reply = ""
 
             with st.spinner("Thinking..."):
-                chat_messages = [
-                    {"role": "system", "content": "You are EvalBuddy, an expert AI in program evaluation."}
+                # Compose chat context
+                chat_context = [
+                    {"role": "system", "content": "You are EvalBuddy, an expert in program evaluation."}
                 ]
+
                 if st.session_state.pdf_content:
-                    chat_messages.append({"role": "system", "content": f"PDF context:\n{st.session_state.pdf_content[:3000]}"})
-                chat_messages.extend(st.session_state.messages)
+                    chat_context.append({
+                        "role": "user",
+                        "content": "Context from uploaded PDF:\n" + st.session_state.pdf_content[:3000]
+                    })
+
+                chat_context += st.session_state.messages
 
                 try:
-                    response, model_used = get_model_response(chat_messages)
+                    # Combine user prompt into Gemini format
+                    user_prompt = "\n".join([f"{m['role']}: {m['content']}" for m in chat_context])
+
+                    response = model.generate_content(user_prompt, stream=True)
 
                     for chunk in response:
-                        delta = chunk.choices[0].delta.content or ""
-                        full_reply += delta
-                        placeholder.markdown(full_reply + "▌")
-                        time.sleep(0.01)
+                        if chunk.text:
+                            full_reply += chunk.text
+                            placeholder.markdown(full_reply + "▌")
+                            time.sleep(0.01)
 
                     placeholder.markdown(full_reply)
                     st.session_state.messages.append({"role": "assistant", "content": full_reply})
-                    st.caption(f"🧠 Powered by: `{model_used}`")
+                    st.caption("🤖 Powered by: Gemini Pro")
 
                 except Exception as e:
-                    st.error(f"OpenAI API Error: {e}")
+                    st.error(f"Gemini API Error: {e}")
 
-    # ✅ Export to PDF only
     if st.button("🖨️ Export Conversation as PDF"):
         export_conversation_pdf(st.session_state.messages)
 
-# 📚 Resources UI
+# 📚 Resource Finder
 def show_resources():
     st.subheader("📚 Evaluation Resources")
     context = st.text_area("Describe your evaluation context:")
@@ -124,7 +111,7 @@ def show_resources():
             for rec in recommend_resources(context):
                 st.markdown(f"- {rec}")
 
-# ✅ Route by tab
+# 🧭 Route views
 if tab == "💬 Chat":
     show_chat()
 elif tab == "📚 Resources":
