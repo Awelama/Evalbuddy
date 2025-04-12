@@ -5,7 +5,7 @@ from helpers.chart import generate_chart
 from helpers.pdf_utils import extract_pdf_text, preview_pdf
 from helpers.export import export_conversation_md, export_conversation_pdf
 from helpers import recommend_resources
-from google.generativeai import GenerativeModel
+from openai import GenerativeModel
 
 st.set_page_config(page_title="EvalBuddy", layout="wide", initial_sidebar_state="expanded")
 
