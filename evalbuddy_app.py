@@ -7,11 +7,17 @@ from docx import Document
 from io import BytesIO
 import matplotlib.pyplot as plt
 import time
+import os
 
-# Must be first
+# ========== Gemini API Key Setup ==========
+genai.configure(
+    api_key=os.getenv("GOOGLE_API_KEY") or "YOUR_API_KEY_HERE"  # Replace with your key
+)
+
+# Must be first Streamlit command
 st.set_page_config(page_title="EvalBuddy", layout="wide")
 
-# =================== CSS ===================
+# ========== Custom CSS ==========
 def apply_custom_css():
     st.markdown("""
     <style>
@@ -40,7 +46,7 @@ def apply_custom_css():
     </style>
     """, unsafe_allow_html=True)
 
-# =================== PDF UPLOAD ===================
+# ========== PDF Upload ==========
 def pdf_upload_area():
     uploaded_pdf = st.file_uploader("📄 Upload Evaluation PDF", type=["pdf"])
     if uploaded_pdf:
@@ -52,7 +58,7 @@ def pdf_upload_area():
         with st.expander("🔍 Preview Extracted PDF Text"):
             st.text_area("PDF Content", content, height=300, disabled=True)
 
-# =================== EXPORT HELPERS ===================
+# ========== Export Helpers ==========
 def export_chat_to_pdf(messages):
     pdf = FPDF()
     pdf.add_page()
@@ -104,7 +110,7 @@ def export_chart_to_pdf(fig):
     output.seek(0)
     return output
 
-# =================== GEMINI SETUP ===================
+# ========== Gemini Initialization ==========
 @st.cache_resource
 def initialize_chat_session(model_name, temperature):
     generation_config = {
@@ -113,11 +119,16 @@ def initialize_chat_session(model_name, temperature):
         "top_k": 40,
         "max_output_tokens": 8192,
     }
-    model = genai.GenerativeModel(
-        model_name=model_name,
-        generation_config=generation_config,
-    )
-    return model.start_chat()
+    try:
+        model = genai.GenerativeModel(
+            model_name="models/gemini-pro",
+            generation_config=generation_config,
+        )
+        return model.start_chat()
+    except Exception as e:
+        st.error("❌ Failed to initialize Gemini model.")
+        st.exception(e)
+        return None
 
 def stream_response(response: GenerateContentResponse):
     for chunk in response:
@@ -126,7 +137,7 @@ def stream_response(response: GenerateContentResponse):
 def display_processing_indicator():
     return st.markdown('<div class="processing-indicator">EvalBuddy is thinking...</div>', unsafe_allow_html=True)
 
-# =================== CHAT TAB ===================
+# ========== Chat Tab ==========
 def home_page():
     st.header("Chat with EvalBuddy")
     st.caption("EvalBuddy is an AI assistant for evaluation guidance.")
@@ -147,30 +158,36 @@ def home_page():
             placeholder = st.empty()
             indicator = display_processing_indicator()
 
-            if "chat_session" not in st.session_state:
+            if "chat_session" not in st.session_state or st.session_state.chat_session is None:
                 st.session_state.chat_session = initialize_chat_session(
                     st.session_state.model_name,
                     st.session_state.temperature
                 )
-                st.session_state.chat_session.send_message(f"System: {st.session_state.system_prompt}")
-                if st.session_state.pdf_content:
-                    st.session_state.chat_session.send_message(
-                        f"The following is the content of an uploaded PDF document:\n\n{st.session_state.pdf_content}"
-                    )
 
             try:
-                response = st.session_state.chat_session.send_message(current_message["content"], stream=True)
-                full_response = ""
-                for chunk in stream_response(response):
-                    full_response += chunk
-                    placeholder.markdown(full_response + "▌")
-                    time.sleep(0.001)  # Reduced for speed
-                indicator.empty()
-                placeholder.markdown(full_response)
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                if st.session_state.chat_session:
+                    # First-time setup messages
+                    if "chat_initialized" not in st.session_state:
+                        st.session_state.chat_session.send_message(f"System: {st.session_state.system_prompt}")
+                        if st.session_state.pdf_content:
+                            st.session_state.chat_session.send_message(
+                                f"The following is the content of an uploaded PDF document:\n\n{st.session_state.pdf_content}"
+                            )
+                        st.session_state.chat_initialized = True
+
+                    response = st.session_state.chat_session.send_message(current_message["content"], stream=True)
+                    full_response = ""
+                    for chunk in stream_response(response):
+                        full_response += chunk
+                        placeholder.markdown(full_response + "▌")
+                        time.sleep(0.001)
+                    indicator.empty()
+                    placeholder.markdown(full_response)
+                    st.session_state.messages.append({"role": "assistant", "content": full_response})
             except Exception as e:
                 indicator.empty()
-                st.error(f"Error: {e}")
+                st.error("❌ Gemini response failed.")
+                st.exception(e)
 
     st.markdown("---")
     st.subheader("📤 Export Conversation")
@@ -183,14 +200,14 @@ def home_page():
             doc = export_chat_to_docx(st.session_state.messages)
             st.download_button("📝 Download Word", doc, "EvalBuddy_Chat.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
-# =================== RESOURCES TAB ===================
+# ========== Resources Tab ==========
 def resources_page():
     st.header("Evaluation Resources")
     context = st.text_area("Describe your evaluation context:")
     if st.button("Get Recommendations"):
-        st.info("⚠️ Recommendation system not yet connected.")
+        st.info("⚠️ This requires integration with a recommend_resources() function.")
 
-# =================== TOOLS TAB ===================
+# ========== Tools Tab ==========
 def evaluation_tools_page():
     st.header("Evaluation Tools")
 
@@ -281,11 +298,11 @@ def evaluation_tools_page():
                 chart_pdf = export_chart_to_pdf(fig)
                 st.download_button("Download Chart PDF", chart_pdf, "Chart.pdf", mime="application/pdf")
 
-# =================== MAIN ===================
+# ========== Main App ==========
 def main():
     apply_custom_css()
     st.session_state.setdefault("messages", [])
-    st.session_state.setdefault("model_name", "gemini-pro")
+    st.session_state.setdefault("model_name", "models/gemini-pro")
     st.session_state.setdefault("temperature", 0.7)
     st.session_state.setdefault("system_prompt", "You are EvalBuddy, an AI assistant specialized in program evaluation.")
     st.session_state.setdefault("pdf_content", "")
